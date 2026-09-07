@@ -1,0 +1,17 @@
+# Cloudflare Tunnel Configuration for Mac mini M4 AI Gateway
+tunnel: 6ca7b2fb-0a53-4aba-bb24-96a905963491
+credentials-file: /Users/nibizvideoeditor/.cloudflared/6ca7b2fb-0a53-4aba-bb24-96a905963491.json
+
+# Ingress Rules: Route agnes.jobab.chat to Gateway API on port 8000
+ingress:
+  - hostname: agnes.jobab.chat
+    service: http://127.0.0.1:8000
+    originRequest:
+      connectTimeout: 30s
+      noTLSVerify: false
+      disableChunkedEncoding: false
+      http2Origin: true
+
+  # Catch-all rule returning 404 for unrecognized traffic
+  - service: http_status:404
+

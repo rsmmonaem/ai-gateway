@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Model Gateway | Mac mini M4</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#eef2ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#312e81' },
+            darkbg: '#0f172a',
+            cardbg: '#1e293b',
+            bordercol: '#334155'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  </style>
+</head>
+<body class="bg-[#0b0f19] text-slate-100 min-h-screen flex flex-col">
+
+  <!-- Navigation Bar -->
+  <header class="border-b border-slate-800 bg-[#0f172a]/90 backdrop-blur sticky top-0 z-40 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+        <i class="fa-solid fa-microchip text-white text-base"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
+          AI Model Gateway
+          <span class="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Mac mini M4</span>
+        </h1>
+        <p class="text-xs text-slate-400">OpenRouter-Style Private Inference Gateway</p>
+      </div>
+    </div>
+
+    <!-- Active User, Role Toggle & Login/Logout -->
+    <div class="flex items-center space-x-3">
+      <!-- Authenticated State -->
+      <div id="authSection" class="flex items-center space-x-2.5">
+        <span class="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-2">
+          <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="currentUserDisplay">admin@example.com</span>
+          <span id="currentUserBadge" class="px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">ADMIN</span>
+        </span>
+        <button id="toggleRoleBtn" onclick="toggleRole()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium px-2.5 py-1.5 rounded-lg transition shadow flex items-center gap-1.5">
+          <i class="fa-solid fa-repeat text-indigo-400 text-[11px]"></i>
+          <span>Switch to <strong id="toggleRoleText">User View</strong></span>
+        </button>
+        <button id="logoutBtn" onclick="handleLogout()" class="text-xs bg-slate-800 hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-800/60 font-medium px-2.5 py-1.5 rounded-lg transition shadow flex items-center gap-1.5" title="Sign out of current session">
+          <i class="fa-solid fa-arrow-right-from-bracket text-rose-400 text-[11px]"></i>
+          <span>Log Out</span>
+        </button>
+      </div>
+
+      <!-- Unauthenticated State (Hidden when logged in) -->
+      <div id="unauthSection" class="hidden flex items-center space-x-2.5">
+        <span class="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800/60 text-slate-400 border border-slate-800 flex items-center gap-1.5">
+          <span class="h-2 w-2 rounded-full bg-slate-500"></span>
+          <span>Not Signed In</span>
+        </span>
+        <button id="loginBtn" onclick="openLoginModal()" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3 py-1.5 rounded-lg transition shadow-lg shadow-indigo-600/20 flex items-center gap-1.5">
+          <i class="fa-solid fa-arrow-right-to-bracket text-[11px]"></i>
+          <span>Log In</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Layout Body -->
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 border-r border-slate-800 bg-[#0f172a]/50 p-4 space-y-6 flex flex-col justify-between">
+      <nav class="space-y-1">
+        <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2" id="sidebarSectionHeader">Admin Controls</div>
+        
+        <button onclick="navigateTab('overview')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition text-indigo-400 bg-indigo-500/10" id="btn-overview">
+          <i class="fa-solid fa-chart-pie w-4 text-center"></i>
+          <span>Overview</span>
+        </button>
+
+        <button onclick="navigateTab('models')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/60" id="btn-models">
+          <i class="fa-solid fa-cubes w-4 text-center"></i>
+          <span>Models Registry</span>
+        </button>
+
+        <button onclick="navigateTab('keys')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/60" id="btn-keys">
+          <i class="fa-solid fa-key w-4 text-center"></i>
+          <span>API Keys</span>
+        </button>
+
+        <button onclick="navigateTab('playground')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/60" id="btn-playground">
+          <i class="fa-solid fa-terminal w-4 text-center"></i>
+          <span>Playground</span>
+        </button>
+
+        <button onclick="navigateTab('logs')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 admin-only" id="btn-logs">
+          <i class="fa-solid fa-list-check w-4 text-center"></i>
+          <span>Request Logs</span>
+        </button>
+
+        <button onclick="navigateTab('users')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 admin-only" id="btn-users">
+          <i class="fa-solid fa-users w-4 text-center"></i>
+          <span>User Accounts</span>
+        </button>
+
+        <button onclick="navigateTab('docs')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/60" id="btn-docs">
+          <i class="fa-solid fa-book w-4 text-center"></i>
+          <span>Quickstart & Docs</span>
+        </button>
+      </nav>
+
+      <!-- Host Hardware Info -->
+      <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+        <div class="flex items-center justify-between text-xs font-semibold text-slate-300">
+          <span>Inference Host</span>
+          <span class="text-emerald-400 flex items-center gap-1">
+            <i class="fa-solid fa-circle text-[8px]"></i> Active
+          </span>
+        </div>
+        <div class="text-[11px] text-slate-400 space-y-1">
+          <div class="flex justify-between"><span>Arch:</span><span class="text-slate-300">Apple Silicon (M4)</span></div>
+          <div class="flex justify-between"><span>Acceleration:</span><span class="text-slate-300">Metal GPU Unified</span></div>
+          <div class="flex justify-between"><span>Gateway:</span><span class="text-slate-300">Port 8000</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto p-8" id="mainContainer">
+
+      <!-- ================= OVERVIEW TAB ================= -->
+      <section id="tab-overview" class="space-y-8">
+        <div>
+          <h2 class="text-xl font-bold text-white">System Telemetry & Performance</h2>
+          <p class="text-sm text-slate-400">Real-time statistics across all local Apple Silicon models.</p>
+        </div>
+
+        <!-- Metrics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div class="p-5 rounded-2xl bg-[#131b2e] border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span>Total Requests</span>
+              <i class="fa-solid fa-arrow-trend-up text-indigo-400"></i>
+            </div>
+            <div class="text-2xl font-extrabold text-white" id="stat-requests">--</div>
+            <div class="text-xs text-slate-500"><span id="stat-today-reqs" class="text-indigo-400 font-semibold">--</span> today</div>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-[#131b2e] border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span>Tokens Metered</span>
+              <i class="fa-solid fa-coins text-purple-400"></i>
+            </div>
+            <div class="text-2xl font-extrabold text-white" id="stat-tokens">--</div>
+            <div class="text-xs text-slate-500"><span id="stat-today-tokens" class="text-purple-400 font-semibold">--</span> today</div>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-[#131b2e] border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span>Average Latency</span>
+              <i class="fa-solid fa-gauge-high text-emerald-400"></i>
+            </div>
+            <div class="text-2xl font-extrabold text-white" id="stat-latency">--</div>
+            <div class="text-xs text-slate-500">Error rate: <span id="stat-error-rate" class="text-emerald-400 font-semibold">0.0%</span></div>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-[#131b2e] border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+              <span>Active Models</span>
+              <i class="fa-solid fa-layer-group text-sky-400"></i>
+            </div>
+            <div class="text-2xl font-extrabold text-white" id="stat-models">--</div>
+            <div class="text-xs text-slate-500"><span id="stat-keys" class="text-sky-400 font-semibold">--</span> active API keys</div>
+          </div>
+        </div>
+
+        <!-- Models Status Quick List -->
+        <div class="p-6 rounded-2xl bg-[#131b2e] border border-slate-800 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-white">Local Model Engines Status</h3>
+            <button onclick="refreshOverview()" class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5">
+              <i class="fa-solid fa-rotate-right"></i> Refresh
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-300">
+              <thead class="text-xs uppercase bg-slate-900/60 text-slate-400 border-b border-slate-800">
+                <tr>
+                  <th class="py-3 px-4">Public Model Slug</th>
+                  <th class="py-3 px-4">Backend Engine</th>
+                  <th class="py-3 px-4">Internal Endpoint</th>
+                  <th class="py-3 px-4">Context</th>
+                  <th class="py-3 px-4">Status</th>
+                  <th class="py-3 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="overviewModelsTable" class="divide-y divide-slate-800/60">
+                <!-- Injected via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODELS REGISTRY TAB ================= -->
+      <section id="tab-models" class="space-y-6 hidden">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-bold text-white">Model Registry & Routing Strategy</h2>
+            <p class="text-sm text-slate-400">Configure multi-backend inference providers and priority routing.</p>
+          </div>
+          <button onclick="openAddModelModal()" class="admin-only bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition flex items-center gap-2">
+            <i class="fa-solid fa-plus"></i> Register Model
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="modelsCardGrid">
+          <!-- Injected via JS -->
+        </div>
+      </section>
+
+      <!-- ================= API KEYS TAB ================= -->
+      <section id="tab-keys" class="space-y-6 hidden">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-bold text-white">API Key Management</h2>
+            <p class="text-sm text-slate-400">Generate secure <code class="text-indigo-400">sk-local-...</code> keys for OpenAI SDK and client applications.</p>
+          </div>
+          <button onclick="openCreateKeyModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition flex items-center gap-2">
+            <i class="fa-solid fa-plus"></i> Create New Key
+          </button>
+        </div>
+
+        <div class="rounded-2xl bg-[#131b2e] border border-slate-800 overflow-hidden">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="text-xs uppercase bg-slate-900/60 text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="py-3.5 px-4">Key Name</th>
+                <th class="py-3.5 px-4">Key Prefix</th>
+                <th class="py-3.5 px-4">Rate Limit (RPM)</th>
+                <th class="py-3.5 px-4">Monthly Quota</th>
+                <th class="py-3.5 px-4">Created</th>
+                <th class="py-3.5 px-4">Status</th>
+                <th class="py-3.5 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="apiKeysTable" class="divide-y divide-slate-800/60">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= PLAYGROUND TAB ================= -->
+      <section id="tab-playground" class="space-y-6 hidden">
+        <div>
+          <h2 class="text-xl font-bold text-white">Interactive Model Playground</h2>
+          <p class="text-sm text-slate-400">Test completions with real-time SSE streaming against any active local model.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-1 p-5 rounded-2xl bg-[#131b2e] border border-slate-800 space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Select Model</label>
+              <select id="playModelSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">API Key</label>
+              <input type="password" id="playApiKeyInput" placeholder="sk-local-..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+              <p class="text-[11px] text-slate-500 mt-1">Pre-filled with your active bootstrap admin key.</p>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs font-semibold text-slate-300 mb-1">
+                <span>Temperature</span>
+                <span id="tempVal" class="text-indigo-400">0.7</span>
+              </div>
+              <input type="range" id="playTempInput" min="0" max="2" step="0.1" value="0.7" oninput="document.getElementById('tempVal').innerText=this.value" class="w-full">
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Max Tokens</label>
+              <input type="number" id="playMaxTokensInput" value="256" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <div class="flex items-center space-x-2">
+              <input type="checkbox" id="playStreamCheckbox" checked class="rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-0">
+              <label for="playStreamCheckbox" class="text-xs text-slate-300">Enable Streaming (SSE)</label>
+            </div>
+
+            <button onclick="runPlayground()" id="runPlayBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20">
+              <i class="fa-solid fa-paper-plane text-xs"></i>
+              <span>Send Request</span>
+            </button>
+          </div>
+
+          <div class="lg:col-span-2 p-5 rounded-2xl bg-[#131b2e] border border-slate-800 flex flex-col justify-between h-[580px]">
+            <div class="overflow-y-auto space-y-4 pr-2 flex-1 mb-4" id="playMessagesContainer">
+              <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-sm text-slate-300">
+                <span class="font-bold text-indigo-400 block mb-1">Assistant</span>
+                Hello! I am connected to your self-hosted Mac mini M4 gateway. Ask me anything!
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <input type="text" id="playPromptInput" placeholder="Type your message here..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500" onkeydown="if(event.key==='Enter') runPlayground()">
+                <button onclick="runPlayground()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-3 rounded-xl font-medium text-sm transition">Send</button>
+              </div>
+              <div class="flex justify-between text-[11px] text-slate-500">
+                <span id="playgroundStats">Ready</span>
+                <span>Mac mini M4 Unified Memory</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= REQUEST LOGS TAB ================= -->
+      <section id="tab-logs" class="space-y-6 hidden admin-only">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-bold text-white">Inference Request Logs</h2>
+            <p class="text-sm text-slate-400">Structured telemetry logs with latency, tokens, and response status.</p>
+          </div>
+          <button onclick="fetchLogs()" class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-rotate-right"></i> Refresh Logs
+          </button>
+        </div>
+
+        <div class="rounded-2xl bg-[#131b2e] border border-slate-800 overflow-hidden">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="text-xs uppercase bg-slate-900/60 text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="py-3 px-4">Request ID</th>
+                <th class="py-3 px-4">Model</th>
+                <th class="py-3 px-4">Backend</th>
+                <th class="py-3 px-4">Tokens (In/Out)</th>
+                <th class="py-3 px-4">Latency</th>
+                <th class="py-3 px-4">Status</th>
+                <th class="py-3 px-4">Time</th>
+              </tr>
+            </thead>
+            <tbody id="requestLogsTable" class="divide-y divide-slate-800/60 text-xs">
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= USER ACCOUNTS TAB ================= -->
+      <section id="tab-users" class="space-y-6 hidden admin-only">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-bold text-white">User Accounts & Permissions</h2>
+            <p class="text-sm text-slate-400">Manage client and team accounts accessing the model gateway.</p>
+          </div>
+          <button onclick="openAddUserModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition flex items-center gap-2">
+            <i class="fa-solid fa-user-plus"></i> Add User
+          </button>
+        </div>
+
+        <div class="rounded-2xl bg-[#131b2e] border border-slate-800 overflow-hidden">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="text-xs uppercase bg-slate-900/60 text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="py-3.5 px-4">ID</th>
+                <th class="py-3.5 px-4">Email</th>
+                <th class="py-3.5 px-4">Name</th>
+                <th class="py-3.5 px-4">Role</th>
+                <th class="py-3.5 px-4">Status</th>
+                <th class="py-3.5 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTable" class="divide-y divide-slate-800/60">
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= QUICKSTART & DOCS TAB ================= -->
+      <section id="tab-docs" class="space-y-6 hidden">
+        <div>
+          <h2 class="text-xl font-bold text-white">OpenAI-Compatible Integration Guide</h2>
+          <p class="text-sm text-slate-400">Any application or framework supporting OpenAI can connect directly to your Mac mini M4 gateway.</p>
+        </div>
+
+        <div class="p-6 rounded-2xl bg-[#131b2e] border border-slate-800 space-y-4">
+          <div class="flex items-center space-x-2 border-b border-slate-800 pb-3 flex-wrap gap-y-2">
+            <button onclick="showCodeSnippet('python')" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-600 text-white code-tab-btn" id="btn-code-python">Python (OpenAI)</button>
+            <button onclick="showCodeSnippet('anthropic-py')" class="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-400 hover:text-white code-tab-btn" id="btn-code-anthropic-py">Python (Anthropic SDK)</button>
+            <button onclick="showCodeSnippet('curl')" class="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-400 hover:text-white code-tab-btn" id="btn-code-curl">cURL (OpenAI)</button>
+            <button onclick="showCodeSnippet('anthropic-curl')" class="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-400 hover:text-white code-tab-btn" id="btn-code-anthropic-curl">cURL (Anthropic Messages)</button>
+            <button onclick="showCodeSnippet('js')" class="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-400 hover:text-white code-tab-btn" id="btn-code-js">Node.js / TypeScript</button>
+          </div>
+
+          <div id="snippet-python" class="code-snippet block">
+            <pre class="bg-slate-950 p-4 rounded-xl text-xs text-slate-200 overflow-x-auto font-mono"><code>from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://agnes.jobab.chat/v1",  # Local: http://localhost:8000/v1
+    api_key="sk-local-4fe3605bf7939a421eadc54816d3c7e2d038e07fb4892b57"
+)
+
+response = client.chat.completions.create(
+    model="kimi-7b",
+    messages=[
+        {"role": "system", "content": "You are a concise, helpful assistant."},
+        {"role": "user", "content": "Explain quantum computing in two sentences."}
+    ],
+    stream=True
+)
+
+for chunk in response:
+    content = chunk.choices[0].delta.content
+    if content:
+        print(content, end="", flush=True)
+print()</code></pre>
+          </div>
+
+          <div id="snippet-anthropic-py" class="code-snippet hidden">
+            <pre class="bg-slate-950 p-4 rounded-xl text-xs text-slate-200 overflow-x-auto font-mono"><code>import anthropic
+
+# Works with official Anthropic Python SDK (pip install anthropic)
+client = anthropic.Anthropic(
+    base_url="https://agnes.jobab.chat",  # Local: http://localhost:8000
+    api_key="sk-local-4fe3605bf7939a421eadc54816d3c7e2d038e07fb4892b57"
+)
+
+message = client.messages.create(
+    model="kimi-7b",  # Or qwen-7b, llama-8b, claude-3-5-sonnet (auto-routed)
+    max_tokens=1024,
+    system="You are an AI assistant running locally on Apple Silicon M4.",
+    messages=[
+        {"role": "user", "content": "Hello Anthropic SDK!"}
+    ]
+)
+
+print(message.content[0].text)</code></pre>
+          </div>
+
+          <div id="snippet-curl" class="code-snippet hidden">
+            <pre class="bg-slate-950 p-4 rounded-xl text-xs text-slate-200 overflow-x-auto font-mono"><code>curl -N https://agnes.jobab.chat/v1/chat/completions \
+  -H "Authorization: Bearer sk-local-4fe3605bf7939a421eadc54816d3c7e2d038e07fb4892b57" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "kimi-7b",
+    "messages": [
+      {"role": "user", "content": "Hello from curl!"}
+    ],
+    "stream": true
+  }'</code></pre>
+          </div>
+
+          <div id="snippet-anthropic-curl" class="code-snippet hidden">
+            <pre class="bg-slate-950 p-4 rounded-xl text-xs text-slate-200 overflow-x-auto font-mono"><code>curl -X POST https://agnes.jobab.chat/v1/messages \
+  -H "x-api-key: sk-local-4fe3605bf7939a421eadc54816d3c7e2d038e07fb4892b57" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "kimi-7b",
+    "max_tokens": 512,
+    "system": "You are an AI assistant.",
+    "messages": [
+      {"role": "user", "content": "Hello Anthropic Messages API!"}
+    ]
+  }'</code></pre>
+          </div>
+
+          <div id="snippet-js" class="code-snippet hidden">
+            <pre class="bg-slate-950 p-4 rounded-xl text-xs text-slate-200 overflow-x-auto font-mono"><code>import Anthropic from "@anthropic-ai/sdk";
+
+// Works with official @anthropic-ai/sdk (npm install @anthropic-ai/sdk)
+const client = new Anthropic({
+  baseURL: "https://agnes.jobab.chat",
+  apiKey: "sk-local-4fe3605bf7939a421eadc54816d3c7e2d038e07fb4892b57"
+});
+
+const response = await client.messages.create({
+  model: "kimi-7b",
+  max_tokens: 1024,
+  messages: [{ role: "user", content: "Hello from TypeScript!" }]
+});
+
+console.log(response.content[0].text);</code></pre>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ================= MODALS ================= -->
+  <!-- Key Revealed Modal -->
+  <div id="keyRevealedModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#131b2e] border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center space-x-3 text-emerald-400">
+        <i class="fa-solid fa-circle-check text-xl"></i>
+        <h3 class="text-base font-bold text-white">API Key Created</h3>
+      </div>
+      <p class="text-xs text-slate-300">Copy this key now. For your security, it will <strong>never be shown again</strong>.</p>
+      
+      <div class="flex items-center gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
+        <code class="text-xs text-indigo-400 font-mono flex-1 select-all break-all" id="revealedKeyText">sk-local-...</code>
+        <button onclick="copyRevealedKey()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1.5 rounded-lg transition">Copy</button>
+      </div>
+
+      <button onclick="closeKeyRevealedModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2 rounded-xl text-xs transition">Done</button>
+    </div>
+  </div>
+
+  <!-- Add Model Modal -->
+  <div id="addModelModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#131b2e] border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-cubes text-indigo-400"></i> Register New Model
+        </h3>
+        <button onclick="closeAddModelModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Display Name</label>
+          <input type="text" id="newModelName" placeholder="e.g. Mistral 7B Instruct" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Public Model Slug</label>
+            <input type="text" id="newModelSlug" placeholder="e.g. mistral-7b" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Backend Type</label>
+            <select id="newModelBackend" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white">
+              <option value="mlx">Apple MLX-LM</option>
+              <option value="ollama">Ollama</option>
+              <option value="llamacpp">llama.cpp Metal</option>
+              <option value="openai_compatible">OpenAI Compatible</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Internal Endpoint</label>
+          <input type="text" id="newModelEndpoint" placeholder="e.g. http://127.0.0.1:8081" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Backend Model Name / Tag</label>
+          <input type="text" id="newModelBackendName" placeholder="e.g. mistralai/Mistral-7B-Instruct-v0.3" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Context Length</label>
+            <input type="number" id="newModelContext" value="32768" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Priority</label>
+            <input type="number" id="newModelPriority" value="100" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white">
+          </div>
+        </div>
+        <button onclick="submitAddModel()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition mt-2">Save Model</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add User Modal -->
+  <div id="addUserModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#131b2e] border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-user-plus text-indigo-400"></i> Add User Account
+        </h3>
+        <button onclick="closeAddUserModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Email Address</label>
+          <input type="email" id="newUserEmail" placeholder="user@company.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Full Name</label>
+          <input type="text" id="newUserName" placeholder="Jane Doe" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Password</label>
+          <input type="password" id="newUserPassword" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Role</label>
+          <select id="newUserRole" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white">
+            <option value="user">Standard User</option>
+            <option value="admin">Administrator</option>
+          </select>
+        </div>
+        <button onclick="submitAddUser()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl transition mt-2">Create Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Test Model Drawer / Modal -->
+  <div id="testModelModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#131b2e] border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-vial text-indigo-400"></i> Test Model: <span id="testModalModelSlug" class="text-indigo-300 font-mono"></span>
+        </h3>
+        <button onclick="closeTestModelModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Test Prompt</label>
+          <input type="text" id="testModalPrompt" value="Hello! Are you running on Apple Silicon Metal?" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white">
+        </div>
+        <button onclick="executeModelTest()" id="executeTestBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2">
+          <i class="fa-solid fa-play"></i> Run Test Ping
+        </button>
+
+        <div id="testResultArea" class="hidden p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+          <div class="flex justify-between border-b border-slate-800 pb-2">
+            <span>Status: <strong id="testResultStatus">--</strong></span>
+            <span>Total Latency: <strong id="testResultLatency">--</strong></span>
+          </div>
+          <div>
+            <span class="text-slate-500 block mb-1">Response:</span>
+            <div id="testResultResponse" class="text-slate-200 font-mono bg-slate-900 p-2.5 rounded border border-slate-800 whitespace-pre-wrap"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Login / Sign In Modal -->
+  <div id="loginModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#131b2e] border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl shadow-indigo-950/40">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <i class="fa-solid fa-shield-halved text-white text-base"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white">Sign In to AI Gateway</h3>
+            <p class="text-xs text-slate-400">Mac mini M4 Private Inference Router</p>
+          </div>
+        </div>
+        <button onclick="closeLoginModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-xmark text-sm"></i></button>
+      </div>
+
+      <!-- Error Alert -->
+      <div id="loginErrorAlert" class="hidden p-3 rounded-xl bg-rose-950/50 border border-rose-800/60 text-xs text-rose-300 flex items-center gap-2">
+        <i class="fa-solid fa-circle-exclamation text-rose-400"></i>
+        <span id="loginErrorMsg">Invalid email or password</span>
+      </div>
+
+      <!-- Quick Fill Helper -->
+      <div class="p-3 rounded-xl bg-indigo-950/30 border border-indigo-800/40 flex items-center justify-between text-xs">
+        <div>
+          <span class="font-medium text-indigo-200 block">Bootstrap Admin Account</span>
+          <span class="text-indigo-400/80 text-[11px]">admin@example.com</span>
+        </div>
+        <button type="button" onclick="quickFillAdmin()" class="px-2.5 py-1 bg-indigo-600/40 hover:bg-indigo-600 text-indigo-200 hover:text-white rounded-lg border border-indigo-500/30 text-xs font-medium transition flex items-center gap-1.5">
+          <i class="fa-solid fa-bolt text-[10px]"></i> Quick Fill
+        </button>
+      </div>
+
+      <form onsubmit="submitLogin(event)" class="space-y-3.5 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Email Address</label>
+          <div class="relative">
+            <i class="fa-solid fa-envelope absolute left-3.5 top-3 text-slate-500"></i>
+            <input type="email" id="loginEmail" required placeholder="admin@example.com" value="admin@example.com" class="w-full bg-slate-900 border border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl pl-9 pr-3 py-2.5 text-white outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Password</label>
+          <div class="relative">
+            <i class="fa-solid fa-key absolute left-3.5 top-3 text-slate-500"></i>
+            <input type="password" id="loginPassword" required placeholder="••••••••" value="admin123456" class="w-full bg-slate-900 border border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl pl-9 pr-9 py-2.5 text-white outline-none">
+            <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-3 text-slate-500 hover:text-slate-300">
+              <i class="fa-solid fa-eye text-xs" id="togglePasswordIcon"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" id="loginSubmitBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white font-semibold py-2.5 rounded-xl transition shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 mt-2">
+          <i class="fa-solid fa-arrow-right-to-bracket"></i>
+          <span>Sign In</span>
+        </button>
+      </form>
+
+      <div class="text-center">
+        <span class="text-[11px] text-slate-500">Secured with Argon2id & RS256 JWT tokens</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let currentRole = localStorage.getItem("user_role") || "admin";
+    let currentTab = "overview";
+    let activeApiKey = localStorage.getItem("saved_api_key") || "sk-local-4fe3605bf7939a421eadc54816d3c7e2d038e07fb4892b57";
+    let jwtToken = localStorage.getItem("jwt_token") || "";
+    let userEmail = localStorage.getItem("user_email") || "admin@example.com";
+    let userName = localStorage.getItem("user_name") || "System Admin";
+    let activeModelList = [];
+    let testingModelId = null;
+
+    function updateAuthUI() {
+      const authSection = document.getElementById("authSection");
+      const unauthSection = document.getElementById("unauthSection");
+      const userDisplay = document.getElementById("currentUserDisplay");
+      const badge = document.getElementById("currentUserBadge");
+      const toggleRoleBtn = document.getElementById("toggleRoleBtn");
+      const toggleRoleText = document.getElementById("toggleRoleText");
+      const sidebarHeader = document.getElementById("sidebarSectionHeader");
+
+      if (jwtToken && userEmail) {
+        if (authSection) authSection.classList.remove("hidden");
+        if (unauthSection) unauthSection.classList.add("hidden");
+        if (userDisplay) userDisplay.innerText = userEmail;
+        if (badge) {
+          badge.innerText = currentRole.toUpperCase();
+          if (currentRole === "admin") {
+            badge.className = "px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30";
+          } else {
+            badge.className = "px-1.5 py-0.5 rounded text-[10px] uppercase font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+          }
+        }
+        if (toggleRoleBtn && toggleRoleText) {
+          if (currentRole === "admin") {
+            toggleRoleText.innerText = "User View";
+            if (sidebarHeader) sidebarHeader.innerText = "Admin Controls";
+            document.querySelectorAll(".admin-only").forEach(el => el.classList.remove("hidden"));
+          } else {
+            toggleRoleText.innerText = "Admin View";
+            if (sidebarHeader) sidebarHeader.innerText = "User Controls";
+            document.querySelectorAll(".admin-only").forEach(el => el.classList.add("hidden"));
+          }
+        }
+      } else {
+        if (authSection) authSection.classList.add("hidden");
+        if (unauthSection) unauthSection.classList.remove("hidden");
+        document.querySelectorAll(".admin-only").forEach(el => el.classList.add("hidden"));
+        if (sidebarHeader) sidebarHeader.innerText = "Navigation";
+      }
+    }
+
+    function openLoginModal() {
+      const modal = document.getElementById("loginModal");
+      const alertBox = document.getElementById("loginErrorAlert");
+      if (alertBox) alertBox.classList.add("hidden");
+      if (modal) modal.classList.remove("hidden");
+    }
+
+    function closeLoginModal() {
+      const modal = document.getElementById("loginModal");
+      if (modal) modal.classList.add("hidden");
+    }
+
+    function quickFillAdmin() {
+      const emailInput = document.getElementById("loginEmail");
+      const passInput = document.getElementById("loginPassword");
+      if (emailInput) emailInput.value = "admin@example.com";
+      if (passInput) passInput.value = "admin123456";
+    }
+
+    function togglePasswordVisibility() {
+      const passInput = document.getElementById("loginPassword");
+      const icon = document.getElementById("togglePasswordIcon");
+      if (!passInput) return;
+      if (passInput.type === "password") {
+        passInput.type = "text";
+        if (icon) { icon.classList.remove("fa-eye"); icon.classList.add("fa-eye-slash"); }
+      } else {
+        passInput.type = "password";
+        if (icon) { icon.classList.remove("fa-eye-slash"); icon.classList.add("fa-eye"); }
+      }
+    }
+
+    async function submitLogin(event) {
+      if (event) event.preventDefault();
+      const emailInput = document.getElementById("loginEmail");
+      const passInput = document.getElementById("loginPassword");
+      const email = emailInput ? emailInput.value.trim() : "admin@example.com";
+      const password = passInput ? passInput.value : "admin123456";
+      const btn = document.getElementById("loginSubmitBtn");
+      const alertBox = document.getElementById("loginErrorAlert");
+      const errorMsg = document.getElementById("loginErrorMsg");
+
+      if (alertBox) alertBox.classList.add("hidden");
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Authenticating...</span>`;
+      }
+
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+
+        if (!res.ok) {
+          let errText = "Invalid email or password.";
+          try {
+            const errData = await res.json();
+            errText = errData.detail || errText;
+          } catch (_) {}
+          if (errorMsg) errorMsg.innerText = errText;
+          if (alertBox) alertBox.classList.remove("hidden");
+          return false;
+        }
+
+        const data = await res.json();
+        jwtToken = data.access_token;
+        currentRole = data.role || "admin";
+        userEmail = data.email || email;
+        userName = data.name || "User";
+
+        localStorage.setItem("jwt_token", jwtToken);
+        localStorage.setItem("user_role", currentRole);
+        localStorage.setItem("user_email", userEmail);
+        localStorage.setItem("user_name", userName);
+        localStorage.removeItem("explicitly_logged_out");
+
+        closeLoginModal();
+        updateAuthUI();
+
+        // Refresh currently active tab
+        if (currentTab === "overview") refreshOverview();
+        else if (currentTab === "models") fetchModels();
+        else if (currentTab === "keys") fetchKeys();
+        else if (currentTab === "logs") fetchLogs();
+        else if (currentTab === "users") fetchUsers();
+        else if (currentTab === "playground") populatePlaygroundModels();
+        return true;
+      } catch (err) {
+        if (errorMsg) errorMsg.innerText = "Connection error: " + err.message;
+        if (alertBox) alertBox.classList.remove("hidden");
+        return false;
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fa-solid fa-arrow-right-to-bracket"></i><span>Sign In</span>`;
+        }
+      }
+    }
+
+    function handleLogout() {
+      jwtToken = "";
+      userEmail = "";
+      userName = "";
+      localStorage.removeItem("jwt_token");
+      localStorage.removeItem("user_email");
+      localStorage.removeItem("user_name");
+      localStorage.setItem("explicitly_logged_out", "true");
+
+      // Reset displayed tables with logged out message
+      const overviewTbody = document.getElementById("overviewModelsTable");
+      if (overviewTbody) {
+        overviewTbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-slate-500">Session ended. Please <button onclick="openLoginModal()" class="text-indigo-400 font-semibold underline hover:text-indigo-300">Sign In</button> to view model cluster status.</td></tr>`;
+      }
+      const logsTbody = document.getElementById("requestLogsTable");
+      if (logsTbody) {
+        logsTbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-500">Sign in to view request audit logs.</td></tr>`;
+      }
+      const keysTbody = document.getElementById("apiKeysTable");
+      if (keysTbody) {
+        keysTbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-500">Sign in to manage API keys.</td></tr>`;
+      }
+
+      if (currentTab === 'logs' || currentTab === 'users') {
+        navigateTab('overview');
+      }
+
+      updateAuthUI();
+      openLoginModal();
+    }
+
+    // Automatic Authentication Helper
+    async function ensureAuth() {
+      if (jwtToken) return jwtToken;
+      if (localStorage.getItem("explicitly_logged_out") === "true") {
+        openLoginModal();
+        return "";
+      }
+      const ok = await submitLogin();
+      return ok ? jwtToken : "";
+    }
+
+    async function authFetch(url, options = {}) {
+      let token = await ensureAuth();
+      if (!token) {
+        return new Response(JSON.stringify({ detail: "Not authenticated" }), { status: 401 });
+      }
+      const headers = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+        ...(options.headers || {})
+      };
+      let resp = await fetch(url, { ...options, headers });
+      if (resp.status === 401) {
+        // Token expired or invalid
+        jwtToken = "";
+        localStorage.removeItem("jwt_token");
+        updateAuthUI();
+        openLoginModal();
+      }
+      return resp;
+    }
+
+    // Navigation
+    function navigateTab(tabId) {
+      currentTab = tabId;
+      document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
+      const activeSec = document.getElementById(`tab-${tabId}`);
+      if (activeSec) activeSec.classList.remove('hidden');
+
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('text-indigo-400', 'bg-indigo-500/10');
+        btn.classList.add('text-slate-400');
+      });
+      const activeBtn = document.getElementById(`btn-${tabId}`);
+      if (activeBtn) {
+        activeBtn.classList.add('text-indigo-400', 'bg-indigo-500/10');
+        activeBtn.classList.remove('text-slate-400');
+      }
+
+      if (tabId === 'overview') refreshOverview();
+      if (tabId === 'models') fetchModels();
+      if (tabId === 'keys') fetchKeys();
+      if (tabId === 'logs') fetchLogs();
+      if (tabId === 'users') fetchUsers();
+      if (tabId === 'playground') populatePlaygroundModels();
+    }
+
+    function toggleRole() {
+      if (currentRole === "admin") {
+        currentRole = "user";
+        localStorage.setItem("user_role", "user");
+        if (currentTab === 'logs' || currentTab === 'users') navigateTab('overview');
+      } else {
+        currentRole = "admin";
+        localStorage.setItem("user_role", "admin");
+      }
+      updateAuthUI();
+    }
+
+    function showCodeSnippet(lang) {
+      document.querySelectorAll('.code-snippet').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.code-tab-btn').forEach(b => {
+        b.classList.remove('bg-indigo-600', 'text-white');
+        b.classList.add('text-slate-400');
+      });
+      document.getElementById(`snippet-${lang}`).classList.remove('hidden');
+      const btn = document.getElementById(`btn-code-${lang}`);
+      btn.classList.add('bg-indigo-600', 'text-white');
+      btn.classList.remove('text-slate-400');
+    }
+
+    // Data Loaders
+    async function refreshOverview() {
+      try {
+        const sumRes = await authFetch("/api/admin/usage/summary");
+        if (sumRes.ok) {
+          const s = await sumRes.json();
+          document.getElementById("stat-requests").innerText = s.total_requests.toLocaleString();
+          document.getElementById("stat-tokens").innerText = s.total_tokens.toLocaleString();
+          document.getElementById("stat-today-reqs").innerText = s.requests_today;
+          document.getElementById("stat-today-tokens").innerText = s.tokens_today.toLocaleString();
+          document.getElementById("stat-latency").innerText = s.avg_latency_ms + "ms";
+          document.getElementById("stat-error-rate").innerText = s.error_rate_percent + "%";
+          document.getElementById("stat-models").innerText = s.active_models_count;
+          document.getElementById("stat-keys").innerText = s.active_keys_count;
+        }
+      } catch (e) {
+        console.warn("Telemetry load warning", e);
+      }
+
+      fetchOverviewModels();
+    }
+
+    async function fetchOverviewModels() {
+      try {
+        const res = await authFetch("/api/admin/models");
+        if (res.ok) {
+          const models = await res.json();
+          activeModelList = models;
+          const tbody = document.getElementById("overviewModelsTable");
+          tbody.innerHTML = "";
+          models.forEach(m => {
+            const isOnline = (m.instances && m.instances.some(i => i.health_status === "ONLINE")) || m.slug === "mock-fast";
+            const badge = isOnline
+              ? `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">ONLINE</span>`
+              : `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">STANDBY</span>`;
+
+            tbody.innerHTML += `
+              <tr class="hover:bg-slate-800/40">
+                <td class="py-3 px-4 font-mono font-bold text-white">${m.slug}</td>
+                <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-slate-800 text-indigo-300 font-mono text-xs">${m.backend}</span></td>
+                <td class="py-3 px-4 text-xs font-mono text-slate-400">${m.endpoint}</td>
+                <td class="py-3 px-4 text-xs">${m.context_length.toLocaleString()} tok</td>
+                <td class="py-3 px-4">${badge}</td>
+                <td class="py-3 px-4 text-right">
+                  <button onclick="openTestModelModal(${m.id}, '${m.slug}')" class="text-xs bg-slate-800 hover:bg-slate-700 text-indigo-300 px-2.5 py-1 rounded transition">Test Ping</button>
+                </td>
+              </tr>
+            `;
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function fetchModels() {
+      await fetchOverviewModels();
+      const grid = document.getElementById("modelsCardGrid");
+      grid.innerHTML = "";
+      activeModelList.forEach(m => {
+        grid.innerHTML += `
+          <div class="p-5 rounded-2xl bg-[#131b2e] border border-slate-800 space-y-3">
+            <div class="flex items-start justify-between">
+              <div>
+                <h4 class="font-bold text-white text-base">${m.name}</h4>
+                <code class="text-xs text-indigo-400">${m.slug}</code>
+              </div>
+              <span class="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-800 text-purple-300 border border-purple-500/30">${m.backend}</span>
+            </div>
+            <p class="text-xs text-slate-400 line-clamp-2">${m.description || "Local Apple Silicon model"}</p>
+            <div class="text-xs space-y-1 text-slate-300 border-t border-slate-800/80 pt-3">
+              <div class="flex justify-between"><span>Endpoint:</span><span class="font-mono text-slate-400">${m.endpoint}</span></div>
+              <div class="flex justify-between"><span>Context:</span><span>${m.context_length}</span></div>
+              <div class="flex justify-between"><span>Priority:</span><span>${m.priority}</span></div>
+            </div>
+            <div class="pt-2 flex items-center justify-end gap-2">
+              <button onclick="openTestModelModal(${m.id}, '${m.slug}')" class="text-xs bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 px-3 py-1.5 rounded-lg transition font-medium">Test Ping</button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    async function fetchKeys() {
+      try {
+        const res = await authFetch("/api/admin/api-keys");
+        if (res.ok) {
+          const keys = await res.json();
+          const tbody = document.getElementById("apiKeysTable");
+          tbody.innerHTML = "";
+          keys.forEach(k => {
+            const statusBadge = k.is_active
+              ? `<span class="text-emerald-400 text-xs font-semibold">ACTIVE</span>`
+              : `<span class="text-rose-400 text-xs font-semibold">REVOKED</span>`;
+
+            tbody.innerHTML += `
+              <tr class="hover:bg-slate-800/40">
+                <td class="py-3 px-4 font-medium text-white">${k.name}</td>
+                <td class="py-3 px-4 font-mono text-indigo-400 text-xs">${k.key_prefix}</td>
+                <td class="py-3 px-4">${k.rate_limit_rpm} rpm</td>
+                <td class="py-3 px-4">${k.monthly_limit_tokens.toLocaleString()} tok</td>
+                <td class="py-3 px-4 text-xs text-slate-400">${new Date(k.created_at).toLocaleDateString()}</td>
+                <td class="py-3 px-4">${statusBadge}</td>
+                <td class="py-3 px-4 text-right">
+                  ${k.is_active ? `<button onclick="revokeKey(${k.id})" class="text-xs text-rose-400 hover:text-rose-300">Revoke</button>` : `<span class="text-xs text-slate-600">Revoked</span>`}
+                </td>
+              </tr>
+            `;
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function fetchLogs() {
+      try {
+        const res = await authFetch("/api/admin/usage/records?limit=25");
+        if (res.ok) {
+          const records = await res.json();
+          const tbody = document.getElementById("requestLogsTable");
+          tbody.innerHTML = "";
+          records.forEach(r => {
+            const statusClass = r.status_code < 400 ? "text-emerald-400" : "text-rose-400";
+            tbody.innerHTML += `
+              <tr class="hover:bg-slate-800/40">
+                <td class="py-2.5 px-4 font-mono text-slate-400">${r.request_id}</td>
+                <td class="py-2.5 px-4 font-mono font-semibold text-white">${r.model}</td>
+                <td class="py-2.5 px-4"><span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">${r.backend}</span></td>
+                <td class="py-2.5 px-4">${r.prompt_tokens} / ${r.completion_tokens} (${r.total_tokens})</td>
+                <td class="py-2.5 px-4">${r.duration_ms}ms</td>
+                <td class="py-2.5 px-4 ${statusClass} font-bold">${r.status_code}</td>
+                <td class="py-2.5 px-4 text-slate-500">${new Date(r.created_at).toLocaleTimeString()}</td>
+              </tr>
+            `;
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function fetchUsers() {
+      try {
+        const res = await authFetch("/api/admin/users");
+        if (res.ok) {
+          const users = await res.json();
+          const tbody = document.getElementById("usersTable");
+          tbody.innerHTML = "";
+          users.forEach(u => {
+            tbody.innerHTML += `
+              <tr class="hover:bg-slate-800/40">
+                <td class="py-3 px-4 font-mono text-slate-400 text-xs">${u.id}</td>
+                <td class="py-3 px-4 font-medium text-white">${u.email}</td>
+                <td class="py-3 px-4 text-slate-300">${u.name}</td>
+                <td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-xs bg-slate-800 text-indigo-300">${u.role}</span></td>
+                <td class="py-3 px-4 text-emerald-400 text-xs font-semibold uppercase">${u.status}</td>
+                <td class="py-3 px-4 text-right">
+                  <span class="text-xs text-slate-500">Active</span>
+                </td>
+              </tr>
+            `;
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function populatePlaygroundModels() {
+      if (activeModelList.length === 0) await fetchOverviewModels();
+      const sel = document.getElementById("playModelSelect");
+      sel.innerHTML = "";
+      activeModelList.forEach(m => {
+        sel.innerHTML += `<option value="${m.slug}">${m.name} (${m.slug})</option>`;
+      });
+      document.getElementById("playApiKeyInput").value = activeApiKey;
+    }
+
+    // Modal Actions
+    function openAddModelModal() {
+      document.getElementById("addModelModal").classList.remove("hidden");
+    }
+    function closeAddModelModal() {
+      document.getElementById("addModelModal").classList.add("hidden");
+    }
+    async function submitAddModel() {
+      const payload = {
+        name: document.getElementById("newModelName").value.trim(),
+        slug: document.getElementById("newModelSlug").value.trim(),
+        backend: document.getElementById("newModelBackend").value,
+        endpoint: document.getElementById("newModelEndpoint").value.trim(),
+        backend_model_name: document.getElementById("newModelBackendName").value.trim(),
+        context_length: parseInt(document.getElementById("newModelContext").value) || 32768,
+        priority: parseInt(document.getElementById("newModelPriority").value) || 100,
+        enabled: true
+      };
+      if (!payload.name || !payload.slug || !payload.endpoint) {
+        alert("Please fill in Name, Slug, and Endpoint.");
+        return;
+      }
+      try {
+        const res = await authFetch("/api/admin/models", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          closeAddModelModal();
+          fetchModels();
+          alert("Model registered successfully!");
+        } else {
+          const err = await res.json();
+          alert("Error: " + (err.detail || res.statusText));
+        }
+      } catch (e) {
+        alert("Error saving model: " + e);
+      }
+    }
+
+    function openAddUserModal() {
+      document.getElementById("addUserModal").classList.remove("hidden");
+    }
+    function closeAddUserModal() {
+      document.getElementById("addUserModal").classList.add("hidden");
+    }
+    async function submitAddUser() {
+      const payload = {
+        email: document.getElementById("newUserEmail").value.trim(),
+        name: document.getElementById("newUserName").value.trim(),
+        password: document.getElementById("newUserPassword").value.trim(),
+        role: document.getElementById("newUserRole").value
+      };
+      if (!payload.email || !payload.password) {
+        alert("Please provide an email and password.");
+        return;
+      }
+      try {
+        const res = await authFetch("/api/admin/users", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          closeAddUserModal();
+          fetchUsers();
+          alert("User created successfully!");
+        } else {
+          const err = await res.json();
+          alert("Error: " + (err.detail || res.statusText));
+        }
+      } catch (e) {
+        alert("Error creating user: " + e);
+      }
+    }
+
+    async function openCreateKeyModal() {
+      const keyName = prompt("Enter a label for this API Key:", "Production Key");
+      if (!keyName) return;
+
+      try {
+        const res = await authFetch("/api/user/api-keys", {
+          method: "POST",
+          body: JSON.stringify({ name: keyName, rate_limit_rpm: 60 })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById("revealedKeyText").innerText = data.raw_key;
+          document.getElementById("keyRevealedModal").classList.remove("hidden");
+          localStorage.setItem("saved_api_key", data.raw_key);
+          activeApiKey = data.raw_key;
+          fetchKeys();
+        }
+      } catch (e) {
+        alert("Failed to create key: " + e);
+      }
+    }
+
+    function closeKeyRevealedModal() {
+      document.getElementById("keyRevealedModal").classList.add("hidden");
+    }
+
+    function copyRevealedKey() {
+      const text = document.getElementById("revealedKeyText").innerText;
+      navigator.clipboard.writeText(text);
+      alert("Key copied to clipboard!");
+    }
+
+    async function revokeKey(id) {
+      if (!confirm("Are you sure you want to revoke this API key? This cannot be undone.")) return;
+      await authFetch(`/api/admin/api-keys/${id}/revoke`, { method: "POST" });
+      fetchKeys();
+    }
+
+    function openTestModelModal(id, slug) {
+      testingModelId = id;
+      document.getElementById("testModalModelSlug").innerText = slug;
+      document.getElementById("testResultArea").classList.add("hidden");
+      document.getElementById("testModelModal").classList.remove("hidden");
+    }
+
+    function closeTestModelModal() {
+      document.getElementById("testModelModal").classList.add("hidden");
+    }
+
+    async function executeModelTest() {
+      const btn = document.getElementById("executeTestBtn");
+      const promptText = document.getElementById("testModalPrompt").value;
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Ping in progress...`;
+
+      try {
+        const res = await authFetch(`/api/admin/models/${testingModelId}/test`, {
+          method: "POST",
+          body: JSON.stringify({ prompt: promptText, max_tokens: 40 })
+        });
+        const data = await res.json();
+        document.getElementById("testResultArea").classList.remove("hidden");
+        document.getElementById("testResultStatus").innerText = data.status;
+        document.getElementById("testResultLatency").innerText = data.total_latency_ms + "ms";
+        document.getElementById("testResultResponse").innerText = data.response_text || data.error || "No response";
+      } catch (e) {
+        alert("Test error: " + e);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-play"></i> Run Test Ping`;
+      }
+    }
+
+    async function runPlayground() {
+      const promptInput = document.getElementById("playPromptInput");
+      const prompt = promptInput.value.trim();
+      if (!prompt) return;
+
+      const model = document.getElementById("playModelSelect").value;
+      const apiKey = document.getElementById("playApiKeyInput").value.trim();
+      const temp = parseFloat(document.getElementById("playTempInput").value);
+      const maxTokens = parseInt(document.getElementById("playMaxTokensInput").value);
+      const isStream = document.getElementById("playStreamCheckbox").checked;
+
+      if (!apiKey) {
+        alert("Please enter a valid API key (e.g. create one in the API Keys tab).");
+        return;
+      }
+
+      const container = document.getElementById("playMessagesContainer");
+      container.innerHTML += `
+        <div class="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-800/40 text-sm text-indigo-200">
+          <span class="font-bold text-indigo-300 block mb-1">User</span>
+          ${prompt}
+        </div>
+      `;
+      promptInput.value = "";
+      container.scrollTop = container.scrollHeight;
+
+      const assistantMsgId = `asst-msg-${Date.now()}`;
+      container.innerHTML += `
+        <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-sm text-slate-300" id="${assistantMsgId}">
+          <span class="font-bold text-indigo-400 block mb-1">Assistant (${model})</span>
+          <span class="content-span"><i class="fa-solid fa-spinner fa-spin text-indigo-400"></i> Thinking...</span>
+        </div>
+      `;
+      container.scrollTop = container.scrollHeight;
+
+      const statsSpan = document.getElementById("playgroundStats");
+      statsSpan.innerText = "Inference active on Mac mini M4...";
+      const t0 = performance.now();
+
+      try {
+        const res = await fetch("/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [{ role: "user", content: prompt }],
+            temperature: temp,
+            max_tokens: maxTokens,
+            stream: isStream
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          document.querySelector(`#${assistantMsgId} .content-span`).innerText = `Error (${res.status}): ${err.error?.message || res.statusText}`;
+          statsSpan.innerText = "Failed";
+          return;
+        }
+
+        if (isStream) {
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let fullText = "";
+          document.querySelector(`#${assistantMsgId} .content-span`).innerText = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunkText = decoder.decode(value);
+            const lines = chunkText.split("\n");
+            for (const line of lines) {
+              if (line.startsWith("data: ") && !line.includes("[DONE]")) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  if (data.error) {
+                    fullText = `⚠️ Error: ${data.error.message || JSON.stringify(data.error)}`;
+                    document.querySelector(`#${assistantMsgId} .content-span`).innerHTML = `<span class="text-rose-400 font-medium">${fullText}</span>`;
+                    statsSpan.innerText = "Failed";
+                    break;
+                  }
+                  const delta = data.choices?.[0]?.delta?.content || "";
+                  fullText += delta;
+                  document.querySelector(`#${assistantMsgId} .content-span`).innerText = fullText;
+                  container.scrollTop = container.scrollHeight;
+                } catch (e) {}
+              }
+            }
+          }
+          if (!fullText) {
+            document.querySelector(`#${assistantMsgId} .content-span`).innerHTML = `<span class="text-amber-400 font-medium">⚠️ No text generated. (Check model status in Registry)</span>`;
+          }
+          const elapsed = Math.round(performance.now() - t0);
+          statsSpan.innerText = `Stream completed in ${elapsed}ms`;
+        } else {
+          const data = await res.json();
+          const reply = data.choices?.[0]?.message?.content || "";
+          document.querySelector(`#${assistantMsgId} .content-span`).innerText = reply;
+          const elapsed = Math.round(performance.now() - t0);
+          statsSpan.innerText = `Completed in ${elapsed}ms (${data.usage?.total_tokens || 0} tokens)`;
+        }
+      } catch (err) {
+        document.querySelector(`#${assistantMsgId} .content-span`).innerText = "Network Error: " + err;
+        statsSpan.innerText = "Error";
+      }
+    }
+
+    // Initialize
+    window.addEventListener("DOMContentLoaded", async () => {
+      updateAuthUI();
+      if (localStorage.getItem("explicitly_logged_out") === "true") {
+        openLoginModal();
+      } else {
+        const token = await ensureAuth();
+        if (token) {
+          refreshOverview();
+        }
+      }
+    });
+  </script>
+</body>
+</html>

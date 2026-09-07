@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai_gateway_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ai_gateway}
+      POSTGRES_USER: ${POSTGRES_USER:-gateway_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gateway_secure_password_123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gateway_user} -d ${POSTGRES_DB:-ai_gateway}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai_gateway_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    image: ai-gateway:latest
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: ai_gateway_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-gateway_user}:${POSTGRES_PASSWORD:-gateway_secure_password_123}@postgres:5432/${POSTGRES_DB:-ai_gateway}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-CHANGE_THIS_IN_PRODUCTION_SECRET_KEY_MIN_32_CHARS}
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - MLX_BASE_URL=http://host.docker.internal:8081
+      - LLAMACPP_BASE_URL=http://host.docker.internal:8082
+      - STORE_REQUEST_CONTENT=${STORE_REQUEST_CONTENT:-false}
+    volumes:
+      - ../backend/app:/app/app
+      - ../frontend_dist:/app/frontend_dist
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      # Allows the containerized gateway to access native Apple Silicon Metal inference servers
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  postgres_data:
+  redis_data:

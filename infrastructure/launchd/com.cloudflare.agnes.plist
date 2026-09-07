@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cloudflare.agnes</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/nibizvideoeditor/.gemini/antigravity/bin/cloudflared</string>
+        <string>tunnel</string>
+        <string>run</string>
+        <string>agnes-gateway</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/nibizvideoeditor/.cloudflared/tunnel.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/nibizvideoeditor/.cloudflared/tunnel.err</string>
+</dict>
+</plist>
