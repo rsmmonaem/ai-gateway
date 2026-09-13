@@ -204,7 +204,7 @@ def list_models():
 
 
 @model_app.command("test")
-def test_model(slug: str, prompt: str = "Hello from Apple Silicon Mac mini M4!"):
+def test_model(slug: str, prompt: str = "Hello from Apple Silicon M5!"):
     """Send a test prompt to a model backend and measure TTFT and total latency."""
     async def _test():
         async with async_session_factory() as session:

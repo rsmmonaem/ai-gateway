@@ -1,6 +1,6 @@
 import json
 import time
-from typing import AsyncIterator, Optional, Tuple
+from typing import AsyncIterator, List, Optional, Tuple
 import httpx
 from fastapi import HTTPException
 
@@ -23,8 +23,8 @@ from app.services.token_counter import count_chat_tokens, count_tokens_text
 
 class OllamaProvider(InferenceProvider):
     """
-    Adapter for Ollama running natively on macOS with Apple Silicon GPU acceleration.
-    Translates OpenAI request/response formats to/from Ollama's native REST API.
+    Adapter for Ollama (0.34.0) running natively on macOS with Apple Silicon M5 Metal GPU acceleration.
+    Translates OpenAI request/response formats to/from Ollama REST API.
     """
 
     async def chat_completion(
@@ -33,9 +33,16 @@ class OllamaProvider(InferenceProvider):
         url = f"{self.endpoint}/api/chat"
         prompt_tokens = count_chat_tokens(request.messages)
 
-        messages_payload = [
-            {"role": msg.role, "content": msg.content or ""} for msg in request.messages
-        ]
+        messages_payload = []
+        for msg in request.messages:
+            content_str = ""
+            if isinstance(msg.content, str):
+                content_str = msg.content
+            elif isinstance(msg.content, list):
+                # Extract text parts
+                text_parts = [p.get("text", "") for p in msg.content if isinstance(p, dict) and p.get("type") == "text"]
+                content_str = "\n".join(text_parts)
+            messages_payload.append({"role": msg.role, "content": content_str})
 
         options = {}
         if request.temperature is not None:
@@ -46,6 +53,10 @@ class OllamaProvider(InferenceProvider):
             options["num_predict"] = request.max_tokens
         if request.stop is not None:
             options["stop"] = [request.stop] if isinstance(request.stop, str) else request.stop
+        if request.frequency_penalty is not None:
+            options["repeat_penalty"] = 1.0 + request.frequency_penalty
+        if request.presence_penalty is not None:
+            options["presence_penalty"] = request.presence_penalty
 
         payload = {
             "model": self.model_name,
@@ -79,7 +90,6 @@ class OllamaProvider(InferenceProvider):
 
         data = resp.json()
         content = data.get("message", {}).get("content", "")
-        # Use exact token counts if Ollama provides them
         prompt_t = data.get("prompt_eval_count", prompt_tokens)
         comp_t = data.get("eval_count", count_tokens_text(content))
 
@@ -107,9 +117,15 @@ class OllamaProvider(InferenceProvider):
         self, request: ChatCompletionRequest
     ) -> AsyncIterator[str]:
         url = f"{self.endpoint}/api/chat"
-        messages_payload = [
-            {"role": msg.role, "content": msg.content or ""} for msg in request.messages
-        ]
+        messages_payload = []
+        for msg in request.messages:
+            content_str = ""
+            if isinstance(msg.content, str):
+                content_str = msg.content
+            elif isinstance(msg.content, list):
+                text_parts = [p.get("text", "") for p in msg.content if isinstance(p, dict) and p.get("type") == "text"]
+                content_str = "\n".join(text_parts)
+            messages_payload.append({"role": msg.role, "content": content_str})
 
         options = {}
         if request.temperature is not None:
@@ -183,25 +199,32 @@ class OllamaProvider(InferenceProvider):
             return CompletionResponse(
                 id=f"cmpl-ollama-{int(time.time())}",
                 model=request.model,
-                choices=[{"text": data.get("response", ""), "index": 0, "finish_reason": "stop"}],
+                choices=[CompletionChoice(text=data.get("response", ""), index=0, finish_reason="stop")],
             )
 
     async def embeddings(self, request: EmbeddingRequest) -> EmbeddingResponse:
         url = f"{self.endpoint}/api/embeddings"
-        prompt = request.input if isinstance(request.input, str) else " ".join(request.input)
-        payload = {"model": self.model_name, "prompt": prompt}
+        prompts: List[str] = [request.input] if isinstance(request.input, str) else request.input
+        results: List[EmbeddingData] = []
+        total_tokens = 0
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            resp = await client.post(url, json=payload)
-            if resp.status_code != 200:
-                raise HTTPException(status_code=resp.status_code, detail=resp.text)
-            data = resp.json()
-            embedding_vector = data.get("embedding", [])
-            return EmbeddingResponse(
-                data=[EmbeddingData(embedding=embedding_vector, index=0)],
-                model=request.model,
-                usage=EmbeddingUsage(prompt_tokens=count_tokens_text(prompt), total_tokens=count_tokens_text(prompt)),
-            )
+            for idx, prompt in enumerate(prompts):
+                payload = {"model": self.model_name, "prompt": prompt}
+                resp = await client.post(url, json=payload)
+                if resp.status_code != 200:
+                    raise HTTPException(status_code=resp.status_code, detail=resp.text)
+                data = resp.json()
+                vec = data.get("embedding", [])
+                t_count = count_tokens_text(prompt)
+                total_tokens += t_count
+                results.append(EmbeddingData(embedding=vec, index=idx))
+
+        return EmbeddingResponse(
+            data=results,
+            model=request.model,
+            usage=EmbeddingUsage(prompt_tokens=total_tokens, total_tokens=total_tokens),
+        )
 
     async def health_check(self) -> Tuple[bool, str, Optional[float]]:
         start = time.time()
@@ -212,7 +235,7 @@ class OllamaProvider(InferenceProvider):
                 if resp.status_code == 200:
                     models = resp.json().get("models", [])
                     has_model = any(self.model_name in m.get("name", "") for m in models)
-                    status_str = "ONLINE (Model Loaded)" if has_model else "ONLINE (Model not loaded)"
+                    status_str = "ONLINE (Model Loaded)" if has_model else "ONLINE (Backend ready)"
                     return True, status_str, latency
         except Exception:
             pass

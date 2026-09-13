@@ -1,52 +1,49 @@
-# Local Model Guide for Apple Silicon M4
+# Local Model & Quantization Guide (Apple Silicon M5 16 GB)
 
-This guide covers model selection, quantization, and memory footprints for common open-source models running on the Mac mini M4.
-
----
-
-## Model Selection Matrix
-
-### 1. Moonshot Kimi 7B
-- **Recommended Backend**: MLX-LM (`python -m mlx_lm.server`)
-- **Recommended Quantization**: 4-bit (`mlx-community/Kimi-7B-Instruct-4bit`)
-- **VRAM Footprint**: ~4.8 GB
-- **Context Length**: 32,768 tokens
-- **Strengths**: Strong reasoning, bilingual Chinese/English comprehension, long-context attention.
-
-### 2. Alibaba Qwen 2.5 7B
-- **Recommended Backend**: Ollama (`ollama pull qwen2.5:7b`)
-- **Recommended Quantization**: Q4_K_M
-- **VRAM Footprint**: ~5.1 GB
-- **Context Length**: 32,768 tokens (up to 128k supported)
-- **Strengths**: Top-tier coding, mathematics, and structured JSON output.
-
-### 3. Meta Llama 3.1 8B
-- **Recommended Backend**: Ollama (`ollama pull llama3.1:8b`) or llama-server Metal
-- **Recommended Quantization**: Q4_K_M (`Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf`)
-- **VRAM Footprint**: ~5.5 GB
-- **Context Length**: 131,072 tokens
-- **Strengths**: General conversation, tool calling, and high instruction obedience.
+This guide covers model selection, quantization choices, and memory footprints for local open-source models running on an **Apple Silicon M5 machine with 16 GB Unified Memory**.
 
 ---
 
-## Quantization Guide
+## Model Selection & Memory Matrix
 
-| Precision | Bits/Weight | Quality Retention | Memory (7B Model) | Generation Speed |
-| :--- | :--- | :--- | :--- | :--- |
-| **FP16** | 16 | 100% | ~14.5 GB | Slow on 16GB RAM |
-| **Q8_0** | 8 | 99.8% | ~7.8 GB | Moderate |
-| **Q4_K_M / 4-bit** | 4.5 | 98.9% | ~4.8 GB - 5.2 GB | **Fastest on M4** (Recommended) |
+| Model Alias | Target Backend | Model Tag / GGUF File | Quantization | Memory Footprint | Recommended Context |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `fast` | Ollama | `qwen2.5:7b` | Q4_K_M | ~5.1 GB | 8192 |
+| `coding` | Ollama / MLX | `qwen2.5-coder:7b` | Q4_K_M | ~5.2 GB | 8192 |
+| `reasoning` | llama-server | `qwen2.5-27b-instruct-q3_k_m.gguf` | **Q3_K_M** | **~11.8 GB** | **4096** |
+| `vision` | Ollama | `qwen2-vl:7b` | Q4_K_M | ~5.5 GB | 4096 |
+| `embedding` | Ollama | `nomic-embed-text` | FP16 | ~0.6 GB | 8192 |
 
 ---
 
-## Context Window Memory Footprint
+## Qwen 27B Quantization on 16 GB Unified Memory
+
+To run **Qwen 2.5 27B** on a 16 GB M5 machine alongside macOS system overhead (~3–4 GB RAM), aggressive quantization is required.
+
+> [!IMPORTANT]
+> **Recommended Quantization**: `Q3_K_M` GGUF.
+> - **Size on disk**: ~11.8 GB
+> - **Inference RAM**: Fits within the available 12 GB RAM window.
+> - **Context window limit**: Keep context length set to `4096` tokens max to prevent KV-cache expansion from causing memory swap thrashing.
+
+### Starting Qwen 27B via llama-server Metal:
+```bash
+llama-server \
+  --host 127.0.0.1 \
+  --port 8082 \
+  -m ./models/qwen2.5-27b-instruct-q3_k_m.gguf \
+  -c 4096 \
+  --ngl 99
+```
+
+---
+
+## Context Window KV-Cache Footprint
 
 KV-Cache memory scales linearly with context length:
-$$\text{KV Memory} \approx 2 \times \text{layers} \times \text{heads} \times \text{head\_dim} \times \text{precision} \times \text{tokens}$$
+$$\text{KV Cache Memory} \approx 2 \times N_{\text{layers}} \times d_{\text{head}} \times N_{\text{heads}} \times \text{tokens} \times \text{bytes\_per\_element}$$
 
-For a 7B model at 16-bit KV cache:
-- 4k tokens: ~0.5 GB
-- 16k tokens: ~2.0 GB
-- 32k tokens: ~4.0 GB
+- For 7B models (8k tokens): ~1.0 GB KV cache
+- For 27B models (4k tokens): ~1.8 GB KV cache
 
-Keep default context limits configured in the gateway to prevent runaway memory allocation.
+The AI Gateway enforces model-specific context budgets to guarantee stable, low-latency token generation on 16 GB RAM.

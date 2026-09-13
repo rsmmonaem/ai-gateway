@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Model Gateway | Mac mini M4</title>
+  <title>AI Model Gateway | Apple Silicon M5</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -37,7 +37,7 @@
       <div>
         <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
           AI Model Gateway
-          <span class="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Mac mini M4</span>
+          <span class="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Apple Silicon M5</span>
         </h1>
         <p class="text-xs text-slate-400">OpenRouter-Style Private Inference Gateway</p>
       </div>
@@ -310,7 +310,7 @@
             <div class="overflow-y-auto space-y-4 pr-2 flex-1 mb-4" id="playMessagesContainer">
               <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-sm text-slate-300">
                 <span class="font-bold text-indigo-400 block mb-1">Assistant</span>
-                Hello! I am connected to your self-hosted Mac mini M4 gateway. Ask me anything!
+                Hello! I am connected to your self-hosted Apple Silicon M5 gateway. Ask me anything!
               </div>
             </div>
 
@@ -321,7 +321,7 @@
               </div>
               <div class="flex justify-between text-[11px] text-slate-500">
                 <span id="playgroundStats">Ready</span>
-                <span>Mac mini M4 Unified Memory</span>
+                <span>Apple Silicon M5 Unified Memory</span>
               </div>
             </div>
           </div>
@@ -393,15 +393,13 @@
       <section id="tab-docs" class="space-y-6 hidden">
         <div>
           <h2 class="text-xl font-bold text-white">OpenAI-Compatible Integration Guide</h2>
-          <p class="text-sm text-slate-400">Any application or framework supporting OpenAI can connect directly to your Mac mini M4 gateway.</p>
+          <p class="text-sm text-slate-400">Any application or framework supporting OpenAI can connect directly to your Apple Silicon M5 gateway.</p>
         </div>
 
         <div class="p-6 rounded-2xl bg-[#131b2e] border border-slate-800 space-y-4">
-          <div class="flex items-center space-x-2 border-b border-slate-800 pb-3 flex-wrap gap-y-2">
-            <button onclick="showCodeSnippet('python')" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-600 text-white code-tab-btn" id="btn-code-python">Python (OpenAI)</button>
-            <button onclick="showCodeSnippet('anthropic-py')" class="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-400 hover:text-white code-tab-btn" id="btn-code-anthropic-py">Python (Anthropic SDK)</button>
-            <button onclick="showCodeSnippet('curl')" class="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-400 hover:text-white code-tab-btn" id="btn-code-curl">cURL (OpenAI)</button>
-            <button onclick="showCodeSnippet('anthropic-curl')" class="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-400 hover:text-white code-tab-btn" id="btn-code-anthropic-curl">cURL (Anthropic Messages)</button>
+          <div class="flex items-center space-x-3 border-b border-slate-800 pb-3">
+            <button onclick="showCodeSnippet('python')" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-600 text-white code-tab-btn" id="btn-code-python">Python (OpenAI SDK)</button>
+            <button onclick="showCodeSnippet('curl')" class="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-400 hover:text-white code-tab-btn" id="btn-code-curl">cURL</button>
             <button onclick="showCodeSnippet('js')" class="text-xs font-semibold px-3 py-1.5 rounded-lg text-slate-400 hover:text-white code-tab-btn" id="btn-code-js">Node.js / TypeScript</button>
           </div>
 
@@ -409,7 +407,7 @@
             <pre class="bg-slate-950 p-4 rounded-xl text-xs text-slate-200 overflow-x-auto font-mono"><code>from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://agnes.jobab.chat/v1",  # Local: http://localhost:8000/v1
+    base_url="http://localhost:8000/v1",  # Or https://api.yourdomain.com/v1
     api_key="sk-local-4fe3605bf7939a421eadc54816d3c7e2d038e07fb4892b57"
 )
 
@@ -429,29 +427,8 @@ for chunk in response:
 print()</code></pre>
           </div>
 
-          <div id="snippet-anthropic-py" class="code-snippet hidden">
-            <pre class="bg-slate-950 p-4 rounded-xl text-xs text-slate-200 overflow-x-auto font-mono"><code>import anthropic
-
-# Works with official Anthropic Python SDK (pip install anthropic)
-client = anthropic.Anthropic(
-    base_url="https://agnes.jobab.chat",  # Local: http://localhost:8000
-    api_key="sk-local-4fe3605bf7939a421eadc54816d3c7e2d038e07fb4892b57"
-)
-
-message = client.messages.create(
-    model="kimi-7b",  # Or qwen-7b, llama-8b, claude-3-5-sonnet (auto-routed)
-    max_tokens=1024,
-    system="You are an AI assistant running locally on Apple Silicon M4.",
-    messages=[
-        {"role": "user", "content": "Hello Anthropic SDK!"}
-    ]
-)
-
-print(message.content[0].text)</code></pre>
-          </div>
-
           <div id="snippet-curl" class="code-snippet hidden">
-            <pre class="bg-slate-950 p-4 rounded-xl text-xs text-slate-200 overflow-x-auto font-mono"><code>curl -N https://agnes.jobab.chat/v1/chat/completions \
+            <pre class="bg-slate-950 p-4 rounded-xl text-xs text-slate-200 overflow-x-auto font-mono"><code>curl -N http://localhost:8000/v1/chat/completions \
   -H "Authorization: Bearer sk-local-4fe3605bf7939a421eadc54816d3c7e2d038e07fb4892b57" \
   -H "Content-Type: application/json" \
   -d '{
@@ -463,37 +440,27 @@ print(message.content[0].text)</code></pre>
   }'</code></pre>
           </div>
 
-          <div id="snippet-anthropic-curl" class="code-snippet hidden">
-            <pre class="bg-slate-950 p-4 rounded-xl text-xs text-slate-200 overflow-x-auto font-mono"><code>curl -X POST https://agnes.jobab.chat/v1/messages \
-  -H "x-api-key: sk-local-4fe3605bf7939a421eadc54816d3c7e2d038e07fb4892b57" \
-  -H "anthropic-version: 2023-06-01" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "kimi-7b",
-    "max_tokens": 512,
-    "system": "You are an AI assistant.",
-    "messages": [
-      {"role": "user", "content": "Hello Anthropic Messages API!"}
-    ]
-  }'</code></pre>
-          </div>
-
           <div id="snippet-js" class="code-snippet hidden">
-            <pre class="bg-slate-950 p-4 rounded-xl text-xs text-slate-200 overflow-x-auto font-mono"><code>import Anthropic from "@anthropic-ai/sdk";
+            <pre class="bg-slate-950 p-4 rounded-xl text-xs text-slate-200 overflow-x-auto font-mono"><code>import OpenAI from "openai";
 
-// Works with official @anthropic-ai/sdk (npm install @anthropic-ai/sdk)
-const client = new Anthropic({
-  baseURL: "https://agnes.jobab.chat",
+const client = new OpenAI({
+  baseURL: "http://localhost:8000/v1",
   apiKey: "sk-local-4fe3605bf7939a421eadc54816d3c7e2d038e07fb4892b57"
 });
 
-const response = await client.messages.create({
-  model: "kimi-7b",
-  max_tokens: 1024,
-  messages: [{ role: "user", content: "Hello from TypeScript!" }]
-});
+async function main() {
+  const stream = await client.chat.completions.create({
+    model: "qwen-7b",
+    messages: [{ role: "user", content: "Hello!" }],
+    stream: true,
+  });
 
-console.log(response.content[0].text);</code></pre>
+  for await (const chunk of stream) {
+    process.stdout.write(chunk.choices[0]?.delta?.content || "");
+  }
+}
+
+main();</code></pre>
           </div>
         </div>
       </section>
@@ -649,7 +616,7 @@ console.log(response.content[0].text);</code></pre>
           </div>
           <div>
             <h3 class="text-base font-bold text-white">Sign In to AI Gateway</h3>
-            <p class="text-xs text-slate-400">Mac mini M4 Private Inference Router</p>
+            <p class="text-xs text-slate-400">Apple Silicon M5 Private Inference Router</p>
           </div>
         </div>
         <button onclick="closeLoginModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"><i class="fa-solid fa-xmark text-sm"></i></button>
@@ -1331,7 +1298,7 @@ console.log(response.content[0].text);</code></pre>
       container.scrollTop = container.scrollHeight;
 
       const statsSpan = document.getElementById("playgroundStats");
-      statsSpan.innerText = "Inference active on Mac mini M4...";
+      statsSpan.innerText = "Inference active on Apple Silicon M5...";
       const t0 = performance.now();
 
       try {

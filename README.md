@@ -1,111 +1,144 @@
-# Self-Hosted OpenRouter-Style AI Model Gateway (Mac mini M4)
+# Universal Local AI Gateway (Apple Silicon M5, 16 GB Unified Memory)
 
-A complete, production-grade, self-hosted AI model router and gateway designed for Apple Silicon (Mac mini M4). Unifies local models (Kimi 7B, Qwen 2.5 7B, Llama 3.1 8B, and MLX/GGUF models) behind a single OpenAI-compatible API endpoint with API key authentication, rate limiting, dynamic model routing, real-time SSE streaming, usage tracking, and secure public exposure through Cloudflare Tunnel.
-
----
-
-## Key Features
-
-- **OpenAI-Compatible API**: Works out-of-the-box with the official OpenAI Python & JS SDKs, LangChain, LlamaIndex, Cursor, and any OpenAI client (`/v1/models`, `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings`).
-- **Apple Silicon Optimized (M4)**: Decouples the gateway from inference engines. Backends run natively with Metal GPU acceleration and Unified Memory bandwidth.
-- **Multi-Backend Provider Adapters**:
-  - **MLX-LM**: Native Apple MLX server (`mlx_lm.server`) for Kimi 7B and fast quantized models.
-  - **Ollama**: Native macOS Ollama server for Qwen 2.5 7B, Llama 3.1 8B, etc.
-  - **llama.cpp**: `llama-server` compiled with Metal support for GGUF models.
-  - **OpenAI-Compatible**: Universal adapter for any OpenAI-compatible server.
-- **API Key System**: Full lifecycle API keys (`sk-local-...`). Raw keys are never stored in the database; verified securely via HMAC-SHA256.
-- **Concurrency & Queue Management**: Protects Unified Memory and prevents GPU thrashing on Mac mini M4.
-- **Dynamic Model Routing**: Exact slug routing (`kimi-7b`), alias routing (`kimi`), and `auto` routing.
-- **Non-Buffering SSE Streaming**: True real-time token streaming with simultaneous token metering.
-- **Web Dashboard**: Modern SPA with Admin Controls, Metrics Overview, Model Registry, Key Management, and Interactive Chat Playground.
-- **Command-Line Interface (CLI)**: `ai-gateway` CLI for administrative automation.
-- **Cloudflare Tunnel Ready**: Keep the Mac mini safely behind your firewall while exposing only the gateway publicly.
+A complete, production-grade, self-hosted universal AI model router and gateway optimized for **Apple Silicon M5 (16 GB Unified Memory)**. Unifies local models served via **Ollama (0.34.0)**, **llama.cpp / llama-server (Metal GGUF)**, and **MLX-LM** behind a single, high-performance OpenAI-compatible API endpoint.
 
 ---
 
 ## Architecture
 
+```mermaid
+flowchart TD
+    Client[Client / OpenAI SDK] --> API[OpenAI-Compatible API<br/>:8000]
+    API --> Auth[HMAC SHA-256 Auth & Rate Limiter]
+    Auth --> Router[Universal Smart Router<br/>Zero-LLM Classifier]
+    
+    subgraph Routing ["Universal Model Aliases"]
+        Router --> |simple / fast| Fast[Fast Alias: Qwen 2.5 7B]
+        Router --> |code / syntax| Coder[Coding Alias: Qwen 2.5 Coder 7B]
+        Router --> |math / logic| Heavy[Reasoning Alias: Qwen 27B Q3 GGUF]
+        Router --> |images| Vis[Vision Alias: Qwen 2 VL]
+    end
+
+    subgraph MemoryQueue ["16 GB Concurrency Queue"]
+        Fast --> OllamaSem[Ollama Semaphore: max 2]
+        Coder --> OllamaSem
+        Heavy --> LlamaSem[llama-server Semaphore: max 1]
+        Vis --> OllamaSem
+    end
+
+    subgraph Backends ["Local Inference Backends"]
+        OllamaSem --> Ollama[Ollama Server<br/>127.0.0.1:11434]
+        LlamaSem --> LlamaServer[llama-server Metal<br/>127.0.0.1:8082]
+    end
+
+    Ollama --> Metal[Apple Silicon M5 GPU & Unified Memory]
+    LlamaServer --> Metal
 ```
-                       INTERNET
-                          │
-                          ▼
-            Cloudflare Tunnel (TLS 1.3)
-                          │
-                          ▼
-        ┌───────────────────────────────────┐
-        │        AI Model Gateway           │
-        │   FastAPI / Uvicorn (Port 8000)   │
-        └─┬───────────────┬───────────────┬─┘
-          │               │               │
-    Authentication   Rate Limiter    Model Router
-    (SHA-256 HMAC)   (Sliding Win)   & Load Balancer
-          │               │               │
-          └───────────────┼───────────────┘
-                          │
-           Semaphore Concurrency Queue
-           (Protects Unified Memory & GPU)
-                          │
-        ┌─────────────────┼─────────────────┐
-        │                 │                 │
-        ▼                 ▼                 ▼
-   [MLX-LM Server]  [Ollama Server]  [llama-server Metal]
-     Port 8081        Port 11434        Port 8082
-      Kimi 7B          Qwen 7B           Llama 8B
-        │                 │                 │
-        └─────────────────┼─────────────────┘
-                          │
-                          ▼
-             macOS Metal Unified Memory
-```
+
+---
+
+## Key Features
+
+- **Universal Model Alias (`model: "universal"`)**: Automatic, zero-LLM request classification routing queries to `fast`, `coding`, `reasoning`, or `vision` models based on content features.
+- **OpenAI API Compatibility**: Full compliance with OpenAI wire spec (`/v1/chat/completions`, `/v1/models`, `/v1/completions`, `/v1/embeddings`).
+- **Memory-Aware 16 GB Allocation**: Protects Apple M5 Unified Memory from RAM exhaustion using bounded context limits (e.g. 4096 tokens for Qwen 27B Q3 GGUF) and per-backend concurrency semaphores.
+- **Multi-Backend Provider System**:
+  - **Ollama (0.34.0)** (`127.0.0.1:11434`)
+  - **llama.cpp / llama-server** (`127.0.0.1:8082`)
+  - **MLX-LM** (`127.0.0.1:8081`)
+  - **OpenAI-Compatible** (Universal HTTP adapter)
+- **Resilience & Bounded Retries**: Retries failed backend connections with exponential backoff & jitter, automatically failing over to healthy secondary providers.
+- **Non-Buffering SSE Streaming**: True real-time Server-Sent Events token streaming with concurrent token metering.
+- **Built-In Benchmarking Utility**: Measure TTFT (Time To First Token), TPS (Tokens/sec), and total latency using `make benchmark`.
+
+---
+
+## Model Strategy for Apple M5 (16 GB RAM)
+
+| Model Alias | Target Backend | Model Specs | Context Budget | Task Profile |
+| :--- | :--- | :--- | :--- | :--- |
+| `universal` | Gateway Router | Smart Classification | 8192 | Automatic task routing |
+| `fast` | Ollama | Qwen 2.5 7B Q4 | 8192 | Fast everyday Q&A |
+| `coding` | Ollama / MLX | Qwen 2.5 Coder 7B | 8192 | Software development & code refactoring |
+| `reasoning` | llama-server | Qwen 27B Q3_K_M GGUF | 4096 | Complex math, proofs & architecture |
+| `vision` | Ollama | Qwen 2 VL 7B | 4096 | Multimodal image understanding |
+| `embedding` | Ollama | Nomic Embed Text | 8192 | Vector embeddings |
 
 ---
 
 ## Quick Start
 
-### 1. One-Click macOS Setup
+### 1. Installation
 ```bash
-git clone <repo-url> ai-gateway
+git clone https://github.com/rsmmonaem/ai-gateway.git
 cd ai-gateway
-
-# Installs runtimes, python venv, and bootstraps DB
 make setup
 ```
 
-### 2. Start the AI Gateway
+### 2. Configure Environment
+Copy `.env.example` to `.env`:
+```bash
+cp .env.example .env
+```
+
+### 3. Start Inference Engine Backends
+In separate terminal windows:
+
+#### Ollama (0.34.0)
+```bash
+ollama serve
+ollama pull qwen2.5:7b
+ollama pull qwen2.5-coder:7b
+```
+
+#### llama-server (Qwen 27B Q3 GGUF for Heavy Reasoning)
+Download `qwen2.5-27b-instruct-q3_k_m.gguf` and start:
+```bash
+llama-server --host 127.0.0.1 --port 8082 -m ./models/qwen2.5-27b-instruct-q3_k_m.gguf -c 4096 --ngl 99
+```
+
+### 4. Start AI Gateway
 ```bash
 make run
 ```
-Open your browser at **`http://localhost:8000`** to access the Web Dashboard and interactive playground.
-
-### 3. Launch Local Inference Backends (Native macOS)
-In separate terminal windows:
-```bash
-# Launch Kimi 7B via Apple MLX-LM
-make run-kimi
-
-# Launch Qwen 2.5 7B via Ollama
-make run-ollama
-```
+Gateway will run at `http://127.0.0.1:8000`.
 
 ---
 
-## Using with OpenAI Python SDK
+## Usage Examples
 
+### 1. Universal Smart Routing (cURL)
+```bash
+curl http://127.0.0.1:8000/v1/chat/completions \
+  -H "Authorization: Bearer sk-local-testkey123456" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "universal",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Design a scalable Laravel SaaS architecture with Redis queues."
+      }
+    ],
+    "stream": true
+  }'
+```
+
+### 2. OpenAI Python SDK
 ```python
 from openai import OpenAI
 
-# Connect to your Mac mini M4 Gateway
 client = OpenAI(
-    base_url="http://localhost:8000/v1",  # Or https://api.yourdomain.com/v1
-    api_key="sk-local-xxxxxxxxxxxxxxxx"
+    base_url="http://127.0.0.1:8000/v1",
+    api_key="sk-local-testkey123456"
 )
 
-# Call Kimi 7B with real-time streaming
+# Use smart universal routing
 response = client.chat.completions.create(
-    model="kimi-7b",
+    model="universal",
     messages=[
-        {"role": "system", "content": "You are an expert AI assistant."},
-        {"role": "user", "content": "Explain quantum computing in simple terms."}
+        {"role": "system", "content": "You are a senior software architect."},
+        {"role": "user", "content": "Write a Python binary search function with tests."}
     ],
     stream=True
 )
@@ -119,54 +152,24 @@ print()
 
 ---
 
-## CLI Administration
+## Benchmarking
 
-Manage the gateway directly from your terminal:
+Run performance benchmarks against the gateway measuring TTFT (Time To First Token), throughput (TPS), and total latency:
 
 ```bash
-# Health check of all backends
-ai-gateway health
+make benchmark
+```
 
-# List models
-ai-gateway model list
-
-# Test a model backend
-ai-gateway model test kimi-7b
-
-# Create and list users
-ai-gateway user create --email dev@local.test --name "Developer" --role user
-ai-gateway user list
-
-# Create a new API key for a user
-ai-gateway key create --email dev@local.test --name "Prod Key" --rpm 120
-
-# Revoke a key
-ai-gateway key revoke 1
+Options:
+```bash
+cd backend && .venv/bin/python scripts/benchmark.py --model universal --iterations 5
 ```
 
 ---
 
-## Cloudflare Tunnel Setup
+## Verification & Testing
 
-To expose the gateway securely to the internet:
-```bash
-./infrastructure/cloudflare/setup-tunnel.sh
-```
-Follow the interactive prompts to authenticate and bind `api.yourdomain.com` to `http://127.0.0.1:8000`.
-
----
-
-## Running with Docker Compose (PostgreSQL & Redis)
-
-If you prefer containerized PostgreSQL and Redis for production:
-```bash
-make docker-up
-```
-
----
-
-## Verification & Tests
-
+Run the automated pytest test suite:
 ```bash
 make test
 ```
@@ -176,7 +179,4 @@ make test
 ## Documentation
 
 - [Architecture Overview](docs/ARCHITECTURE.md)
-- [Mac mini M4 Setup & Hardware Tuning](docs/MAC_M4_SETUP.md)
-- [Model Guide & Quantization](docs/MODEL_GUIDE.md)
-- [API Reference](docs/API_REFERENCE.md)
-- [Cloudflare Tunnel Guide](docs/CLOUDFLARE_TUNNEL.md)
+- [Model & Quantization Guide](docs/MODEL_GUIDE.md)

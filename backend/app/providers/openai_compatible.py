@@ -1,6 +1,6 @@
 import json
 import time
-from typing import AsyncIterator, Optional, Tuple
+from typing import AsyncIterator, List, Optional, Tuple
 import httpx
 from fastapi import HTTPException
 
@@ -13,17 +13,19 @@ from app.schemas.openai import (
     ChatCompletionResponse,
     CompletionRequest,
     CompletionResponse,
+    CompletionUsage,
+    EmbeddingData,
     EmbeddingRequest,
     EmbeddingResponse,
-    CompletionUsage,
+    EmbeddingUsage,
 )
 from app.services.token_counter import count_chat_tokens, count_tokens_text
 
 
 class OpenAICompatibleProvider(InferenceProvider):
     """
-    Adapter for any downstream inference engine implementing OpenAI's HTTP spec.
-    Also provides a built-in mock mode for zero-dependency test verification.
+    Adapter for any downstream inference engine implementing OpenAI's HTTP spec (e.g. llama-server, MLX-LM).
+    Also provides built-in mock mode for zero-dependency test verification.
     """
 
     @property
@@ -37,8 +39,15 @@ class OpenAICompatibleProvider(InferenceProvider):
 
         if self.is_mock:
             # Built-in mock response for testing without downloading models
-            last_msg = request.messages[-1].content if request.messages else "Hello"
-            reply_text = f"Mock response from {self.model_name} on Mac mini M4. Echo: {last_msg}"
+            last_msg = ""
+            if request.messages:
+                content = request.messages[-1].content
+                if isinstance(content, str):
+                    last_msg = content
+                elif isinstance(content, list):
+                    last_msg = str(content)
+
+            reply_text = f"Mock response from {self.model_name} on Apple Silicon M5. Echo: {last_msg}"
             comp_tokens = count_tokens_text(reply_text)
             return ChatCompletionResponse(
                 id=f"chatcmpl-mock-{int(time.time())}",
@@ -62,7 +71,6 @@ class OpenAICompatibleProvider(InferenceProvider):
 
         url = f"{self.endpoint}/v1/chat/completions"
         payload = request.model_dump(exclude_none=True)
-        # Override model name with backend internal model name
         payload["model"] = self.model_name
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -75,7 +83,6 @@ class OpenAICompatibleProvider(InferenceProvider):
                         "error": {
                             "message": f"Cannot connect to backend endpoint '{self.endpoint}'. Is the model server running?",
                             "type": "server_error",
-                            "param": None,
                             "code": "backend_unavailable",
                         }
                     },
@@ -87,7 +94,6 @@ class OpenAICompatibleProvider(InferenceProvider):
                         "error": {
                             "message": f"Backend endpoint '{self.endpoint}' timed out after {self.timeout}s.",
                             "type": "server_error",
-                            "param": None,
                             "code": "backend_timeout",
                         }
                     },
@@ -100,7 +106,6 @@ class OpenAICompatibleProvider(InferenceProvider):
                     "error": {
                         "message": f"Backend returned error ({resp.status_code}): {resp.text}",
                         "type": "backend_error",
-                        "param": None,
                         "code": "backend_error",
                     }
                 },
@@ -113,9 +118,8 @@ class OpenAICompatibleProvider(InferenceProvider):
         self, request: ChatCompletionRequest
     ) -> AsyncIterator[str]:
         if self.is_mock:
-            # Generate simulated stream tokens
             req_id = f"chatcmpl-mock-stream-{int(time.time())}"
-            words = f"Mock streaming response from {self.model_name} on Mac mini M4. Unified Memory Metal active.".split(" ")
+            words = f"Mock streaming response from {self.model_name} on Apple Silicon M5. Unified Memory Metal active.".split(" ")
             for i, word in enumerate(words):
                 chunk_data = {
                     "id": req_id,
@@ -159,6 +163,15 @@ class OpenAICompatibleProvider(InferenceProvider):
             await client.aclose()
 
     async def completion(self, request: CompletionRequest) -> CompletionResponse:
+        if self.is_mock:
+            prompt_str = request.prompt if isinstance(request.prompt, str) else "\n".join(request.prompt)
+            reply = f"Mock completion response for prompt: {prompt_str[:30]}..."
+            return CompletionResponse(
+                id=f"cmpl-mock-{int(time.time())}",
+                model=request.model,
+                choices=[{"text": reply, "index": 0, "finish_reason": "stop"}],
+            )
+
         url = f"{self.endpoint}/v1/completions"
         payload = request.model_dump(exclude_none=True)
         payload["model"] = self.model_name
@@ -170,6 +183,18 @@ class OpenAICompatibleProvider(InferenceProvider):
             return CompletionResponse(**resp.json())
 
     async def embeddings(self, request: EmbeddingRequest) -> EmbeddingResponse:
+        if self.is_mock:
+            prompts = [request.input] if isinstance(request.input, str) else request.input
+            mock_data = [
+                EmbeddingData(embedding=[0.01 * (i + 1)] * 1536, index=i) for i in range(len(prompts))
+            ]
+            t_count = sum(count_tokens_text(p) for p in prompts)
+            return EmbeddingResponse(
+                data=mock_data,
+                model=request.model,
+                usage=EmbeddingUsage(prompt_tokens=t_count, total_tokens=t_count),
+            )
+
         url = f"{self.endpoint}/v1/embeddings"
         payload = request.model_dump(exclude_none=True)
         payload["model"] = self.model_name
@@ -187,7 +212,7 @@ class OpenAICompatibleProvider(InferenceProvider):
         start = time.time()
         for check_path in ["/health", "/v1/health", "/v1/models", "/"]:
             try:
-                async with httpx.AsyncClient(timeout=5.0) as client:
+                async with httpx.AsyncClient(timeout=4.0) as client:
                     resp = await client.get(f"{self.endpoint}{check_path}")
                     latency = round((time.time() - start) * 1000, 2)
                     if resp.status_code in (200, 404):

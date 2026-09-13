@@ -23,6 +23,8 @@ class ModelDefinition(Base):
     supports_embeddings: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     supports_tools: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     supports_vision: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    supports_coding: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    supports_reasoning: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
     pricing_input: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)  # USD per 1M tokens

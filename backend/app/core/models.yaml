@@ -1,0 +1,125 @@
+# Central Model Registry & Capabilities Declaration
+# Optimized for Apple Silicon M5 (16 GB Unified Memory)
+
+models:
+  universal:
+    name: "Universal Smart Router"
+    slug: "universal"
+    aliases: ["universal", "auto", "smart"]
+    provider: "router"
+    backend: "router"
+    backend_model_name: "universal"
+    endpoint: "http://127.0.0.1:8000"
+    context_length: 8192
+    capabilities:
+      - chat
+      - completion
+      - coding
+      - reasoning
+      - vision
+    enabled: true
+    priority: 1000
+    description: "Intelligent gateway router classifying and directing requests to the optimal local backend."
+
+  fast:
+    name: "Qwen 2.5 7B Fast"
+    slug: "fast"
+    aliases: ["fast", "qwen-fast", "general", "qwen-7b"]
+    provider: "local-ollama"
+    backend: "ollama"
+    backend_model_name: "qwen2.5:7b"
+    endpoint: "http://127.0.0.1:11434"
+    context_length: 8192
+    capabilities:
+      - chat
+      - completion
+      - fast
+      - general
+      - tools
+    enabled: true
+    priority: 100
+    description: "High-speed 7B model served via Ollama for general conversational queries."
+
+  coding:
+    name: "Qwen 2.5 Coder 7B"
+    slug: "coding"
+    aliases: ["coding", "coder", "qwen-coder"]
+    provider: "local-ollama"
+    backend: "ollama"
+    backend_model_name: "qwen2.5-coder:7b"
+    endpoint: "http://127.0.0.1:11434"
+    context_length: 8192
+    capabilities:
+      - chat
+      - completion
+      - coding
+      - tools
+    enabled: true
+    priority: 95
+    description: "Specialized code generation and software architecture model served via Ollama or MLX."
+
+  reasoning:
+    name: "Qwen 27B Quantized GGUF"
+    slug: "reasoning"
+    aliases: ["reasoning", "heavy", "qwen-27b"]
+    provider: "local-llamacpp"
+    backend: "llamacpp"
+    backend_model_name: "qwen2.5-27b-instruct-q3_k_m.gguf"
+    endpoint: "http://127.0.0.1:8082"
+    context_length: 4096
+    capabilities:
+      - chat
+      - completion
+      - reasoning
+    enabled: true
+    priority: 90
+    description: "Heavy reasoning model running aggressively quantized Q3 GGUF via llama-server Metal."
+
+  vision:
+    name: "Qwen 2 VL Vision"
+    slug: "vision"
+    aliases: ["vision", "multimodal", "qwen-vl"]
+    provider: "local-ollama"
+    backend: "ollama"
+    backend_model_name: "qwen2-vl:7b"
+    endpoint: "http://127.0.0.1:11434"
+    context_length: 4096
+    capabilities:
+      - chat
+      - vision
+    enabled: true
+    priority: 85
+    description: "Multimodal image understanding and vision model served via Ollama."
+
+  embedding:
+    name: "Nomic Embed Text"
+    slug: "embedding"
+    aliases: ["embedding", "embed", "nomic-embed"]
+    provider: "local-ollama"
+    backend: "ollama"
+    backend_model_name: "nomic-embed-text"
+    endpoint: "http://127.0.0.1:11434"
+    context_length: 8192
+    capabilities:
+      - embeddings
+    enabled: true
+    priority: 80
+    description: "High-quality vector embedding model served via Ollama."
+
+  mock-fast:
+    name: "OpenAI Compatible Test Model"
+    slug: "mock-fast"
+    aliases: ["mock", "test-model"]
+    provider: "local-mock"
+    backend: "openai_compatible"
+    backend_model_name: "mock-fast"
+    endpoint: "http://127.0.0.1:8000/v1/_mock"
+    context_length: 16384
+    capabilities:
+      - chat
+      - completion
+      - fast
+      - tools
+    enabled: true
+    priority: 50
+    description: "Built-in zero-dependency mock endpoint for immediate offline verification."

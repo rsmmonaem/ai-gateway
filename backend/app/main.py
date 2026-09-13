@@ -24,7 +24,7 @@ from app.services.health_checker import health_checker
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info(f"Starting {settings.PROJECT_NAME} v{settings.VERSION} on Mac mini M4...")
+    logger.info(f"Starting {settings.PROJECT_NAME} v{settings.VERSION} on Apple Silicon M5 (16 GB Unified Memory)...")
     async with async_session_factory() as session:
         await init_db(session)
 
@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Self-hosted OpenRouter-style AI Model Gateway for Mac mini M4.",
+    description="Universal AI Model Gateway optimized for Apple Silicon M5 (16 GB Unified Memory).",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -76,8 +76,9 @@ app.include_router(admin_usage.router)
 app.include_router(user_keys.router)
 app.include_router(user_usage.router)
 
-# 5. Serve Web Dashboard static build if available
 static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend_dist")
+if not os.path.exists(static_dir):
+    static_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend_dist")
 if os.path.exists(static_dir):
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="frontend")
 

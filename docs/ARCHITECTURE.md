@@ -1,62 +1,52 @@
-# AI Model Gateway Architecture
+# Universal AI Model Gateway Architecture (Apple Silicon M5)
 
-The AI Model Gateway is a high-performance, private, OpenAI-compatible proxy designed specifically for Apple Silicon hardware (such as the **Mac mini M4**). It completely decouples external client applications from internal inference backends, unifying multiple local models behind a single public API endpoint, authenticated with API keys.
+The AI Model Gateway is a high-performance, private, OpenAI-compatible AI gateway designed specifically for **Apple Silicon M5 hardware (16 GB Unified Memory)**. It completely decouples external client applications from internal inference backends, unifying multiple local models behind a single OpenAI-compatible API endpoint with API key authentication, rate limiting, zero-LLM smart request classification, and fallback resilience.
 
 ---
 
 ## High-Level Topology
 
-```
-                       INTERNET
-                          │
-                          ▼
-            Cloudflare Tunnel (TLS 1.3)
-           (Exposes ONLY port 8000 safely)
-                          │
-                          ▼
-        ┌───────────────────────────────────┐
-        │        AI Model Gateway           │
-        │   FastAPI / Uvicorn (Port 8000)   │
-        └─┬───────────────┬───────────────┬─┘
-          │               │               │
-    Authentication   Rate Limiter    Model Router
-    (SHA-256 HMAC)   (Sliding Win)   & Load Balancer
-          │               │               │
-          └───────────────┼───────────────┘
-                          │
-           Semaphore Concurrency Queue
-           (Protects Unified Memory & GPU)
-                          │
-        ┌─────────────────┼─────────────────┐
-        │                 │                 │
-        ▼                 ▼                 ▼
-   [MLX-LM Server]  [Ollama Server]  [llama-server Metal]
-     Port 8081        Port 11434        Port 8082
-      Kimi 7B          Qwen 7B           Llama 8B
-        │                 │                 │
-        └─────────────────┼─────────────────┘
-                          │
-                          ▼
-             macOS Metal Unified Memory
+```mermaid
+flowchart TD
+    Client[Client Applications / OpenAI SDK] --> |HTTPS / SSE| GW[FastAPI AI Gateway :8000]
+    
+    subgraph GatewayCore ["AI Gateway Core Pipeline"]
+        GW --> Auth[HMAC SHA-256 Auth]
+        Auth --> Rate[Rate Limiter & Quotas]
+        Rate --> Classifier[Zero-LLM Request Classifier]
+        Classifier --> Router[Universal Model Router]
+        Router --> Queue[Concurrency & 16GB Memory Manager]
+        Queue --> Resilience[Resilience & Fallback Executor]
+    end
+
+    subgraph Backends ["Native macOS Apple Silicon Backends"]
+        Resilience --> |HTTP API| Ollama[Ollama Server :11434]
+        Resilience --> |Metal GGUF| LlamaServer[llama-server :8082]
+        Resilience --> |Metal MLX| MLX[MLX-LM Server :8081]
+    end
+
+    Ollama --> Metal[Apple Silicon M5 GPU & Unified Memory]
+    LlamaServer --> Metal
+    MLX --> Metal
 ```
 
 ---
 
-## Core Principles
+## Core Components
 
-### 1. Separation of Concerns
-- **Client Facing**: Clients only see `https://api.yourdomain.com/v1`, using standard OpenAI SDKs with `sk-local-...` bearer keys. Internal network ports (`11434`, `8081`, `8082`), model paths, and backend architectures remain strictly private.
-- **Inference Engines**: Inference engines run natively on macOS to maximize Apple Silicon Metal acceleration and unified memory bandwidth, while the gateway manages routing, rate limiting, and accounting.
+### 1. Universal Smart Router (`model: "universal"`)
+- **Zero-LLM Request Classifier**: Analyzes prompt content, code blocks, syntax keywords (`def`, `class`, `import`), math/logic markers, tool schemas, and image payloads in microseconds without triggering an LLM call.
+- **Alias Resolution**: Maps aliases (`universal`, `fast`, `coding`, `reasoning`, `vision`, `embedding`) to active model definitions.
 
-### 2. Zero-Buffering Streaming (SSE)
-- When a client issues `stream: true`, the gateway establishes an asynchronous HTTP streaming pipeline with the target model backend.
-- Chunks are forwarded immediately to the client as Server-Sent Events (`data: {...}\n\n`).
-- The gateway simultaneously accumulates token counts asynchronously to guarantee zero-latency token delivery while ensuring 100% accurate usage tracking.
+### 2. Memory-Aware Concurrency Queue
+- Shared memory on Apple M5 (16 GB) requires strict concurrency limits to prevent memory swap thrashing.
+- `ConcurrencyManager` enforces global semaphores and backend-specific semaphores (`OLLAMA_CONCURRENCY=2`, `LLAMACPP_CONCURRENCY=1`, `MLX_CONCURRENCY=2`).
 
-### 3. Concurrency Protection for Unified Memory
-- The Mac mini M4 shares memory between CPU and GPU. Over-subscribing concurrent inferences will cause memory paging (swap thrashing) and degrade token generation speed.
-- The Gateway's `ConcurrencyManager` enforces global and per-model concurrent execution semaphores with a configurable queue timeout (`DEFAULT_QUEUE_TIMEOUT_SECONDS=30.0`).
-- If saturated, it returns `503 Service Unavailable` with `Retry-After: 5` rather than dropping requests or crashing the server.
+### 3. Resilience & Fallback Executor
+- Automatically detects retriable errors (`httpx.ConnectError`, `httpx.TimeoutException`, HTTP 502/503/504/429).
+- Performs exponential backoff with random jitter.
+- Seamlessly fails over to secondary healthy provider backends if the primary model server is unavailable.
 
-### 4. Privacy by Default
-- Through `STORE_REQUEST_CONTENT=false`, prompts and model responses are never recorded in database tables or log files. Only metadata (duration, token count, status code, model slug) is stored.
+### 4. Non-Buffering SSE Streaming
+- Standard SSE pipeline (`text/event-stream`).
+- Chunks pass through without buffering while token counts are metered in real-time.

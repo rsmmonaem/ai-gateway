@@ -41,26 +41,43 @@ class Settings(BaseSettings):
             return v
         return ["*"]
 
-    # Gateway Limits & Concurrency
+    # Gateway Limits & Concurrency (Optimized for Apple M5 16 GB Unified Memory)
     DEFAULT_RATE_LIMIT_RPM: int = 60
     DEFAULT_MONTHLY_TOKEN_LIMIT: int = 10_000_000
     DEFAULT_MAX_CONCURRENT_REQUESTS: int = 4
     DEFAULT_QUEUE_TIMEOUT_SECONDS: float = 30.0
     DEFAULT_REQUEST_TIMEOUT_SECONDS: float = 300.0
 
+    # Per-Backend Concurrency Limits
+    OLLAMA_CONCURRENCY: int = 2
+    LLAMACPP_CONCURRENCY: int = 1
+    MLX_CONCURRENCY: int = 2
+
+    # Resilience & Retries
+    MAX_RETRIES: int = 2
+    RETRY_BACKOFF_FACTOR: float = 0.5
+    PROVIDER_TIMEOUT_SECONDS: float = 120.0
+
+    # Model Idle & Context Settings
+    MODEL_IDLE_TIMEOUT_SECONDS: int = 300
+    DEFAULT_MODEL: str = "universal"
+    DEFAULT_CONTEXT_SIZE: int = 8192
+
     # Privacy
     # When False, prompts and completions are NEVER saved in logs or database
     STORE_REQUEST_CONTENT: bool = False
 
-    # Admin bootstrap credentials (used to seed initial admin user if not exists)
+    # Admin bootstrap credentials & default key
     FIRST_ADMIN_EMAIL: str = "admin@example.com"
     FIRST_ADMIN_PASSWORD: str = "admin123456"
     FIRST_ADMIN_NAME: str = "System Admin"
+    GATEWAY_API_KEY: str = ""
 
-    # Inference engine default internal endpoints on Mac mini M4
+    # Inference engine default internal endpoints on Apple Silicon M5
     OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
     MLX_BASE_URL: str = "http://127.0.0.1:8081"
     LLAMACPP_BASE_URL: str = "http://127.0.0.1:8082"
 
 
 settings = Settings()
+

@@ -8,14 +8,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.api_key import get_api_key_auth
 from app.core.config import settings
+from app.core.logging import logger
 from app.database.session import get_db
 from app.models.api_key import APIKey
 from app.models.user import User
+from app.router.classifier import request_classifier
 from app.router.engine import router_engine
 from app.router.queue import concurrency_manager
-from app.schemas.openai import ChatCompletionRequest, ChatCompletionResponse
+from app.router.resilience import resilience_manager
+from app.schemas.openai import ChatCompletionRequest, ChatCompletionResponse, ChatMessage
 from app.services.token_counter import count_chat_tokens, count_tokens_text
 from app.services.usage_tracker import usage_tracker
+from app.services.web_search import web_search_service
 
 router = APIRouter(prefix="/chat", tags=["OpenAI - Chat Completions"])
 
@@ -28,9 +32,9 @@ async def create_chat_completion(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    OpenAI-compatible Chat Completions endpoint.
-    Supports streaming (SSE) and non-streaming responses, multi-model routing,
-    and automatic usage/quota tracking.
+    Universal OpenAI-compatible Chat Completions endpoint.
+    Supports smart 'universal' model routing, web search context augmentation,
+    fallback execution, non-buffering SSE streaming, and automatic token metrics tracking.
     """
     user, api_key = auth
     started_at = datetime.now(timezone.utc)
@@ -38,33 +42,50 @@ async def create_chat_completion(
     req_id = getattr(raw_request.state, "request_id", f"req_{int(time.time()*1000)}")
     client_ip = raw_request.client.host if raw_request.client else "127.0.0.1"
 
-    # 1. Resolve Model and Provider
-    model_def, instance, provider = await router_engine.resolve_model(
+    # Check for Web Search Intent
+    target_cap = request_classifier.classify_request(chat_req)
+    if target_cap == "web_search":
+        user_query = ""
+        for msg in reversed(chat_req.messages):
+            if msg.role == "user" and isinstance(msg.content, str):
+                user_query = msg.content
+                break
+        if user_query:
+            logger.info(f"Web search intent detected for query: '{user_query}'. Performing search...")
+            results = await web_search_service.search(user_query, max_results=3)
+            search_context = web_search_service.format_search_context(results)
+            if search_context:
+                sys_msg = ChatMessage(role="system", content=f"System Web Search Context:\n{search_context}\nUse the web search results above when responding to the user's latest query.")
+                chat_req.messages.insert(0, sys_msg)
+
+    # 1. Resolve Primary Model and Secondary Fallback Candidates
+    primary_def, primary_inst, primary_prov, fallback_candidates = await router_engine.resolve_model_candidates(
         requested_model=chat_req.model,
         user=user,
         db=db,
+        request=chat_req,
     )
 
-    # 2. Acquire Concurrency Slot (Queue Management)
-    await concurrency_manager.acquire(
-        model_slug=model_def.slug,
-        timeout=settings.DEFAULT_QUEUE_TIMEOUT_SECONDS,
-    )
-
+    primary_candidate = (primary_def, primary_inst, primary_prov)
     prompt_tokens = count_chat_tokens(chat_req.messages)
 
     if chat_req.stream:
-        # --- Streaming Execution (Server-Sent Events) ---
+        # --- Streaming Execution with Concurrency Queue ---
+        await concurrency_manager.acquire(
+            model_slug=primary_def.slug,
+            backend=primary_def.backend,
+            timeout=settings.DEFAULT_QUEUE_TIMEOUT_SECONDS,
+        )
+
         async def event_generator():
             accumulated_text = []
             status_code = 200
             error_code = None
             try:
-                if instance:
-                    instance.active_requests += 1
+                if primary_inst:
+                    primary_inst.active_requests += 1
 
-                async for chunk_line in provider.chat_completion_stream(chat_req):
-                    # Inspect chunk for error or completion text to meter tokens
+                async for chunk_line in primary_prov.chat_completion_stream(chat_req):
                     if chunk_line.startswith("data: ") and not chunk_line.startswith("data: [DONE]"):
                         try:
                             payload_json = json.loads(chunk_line[6:].strip())
@@ -88,9 +109,9 @@ async def create_chat_completion(
                 yield f"data: {json.dumps({'error': {'message': str(e)}})}\n\n"
                 yield "data: [DONE]\n\n"
             finally:
-                concurrency_manager.release(model_def.slug)
-                if instance and instance.active_requests > 0:
-                    instance.active_requests -= 1
+                concurrency_manager.release(primary_def.slug, primary_def.backend)
+                if primary_inst and primary_inst.active_requests > 0:
+                    primary_inst.active_requests -= 1
 
                 completed_at = datetime.now(timezone.utc)
                 duration_ms = (time.time() - t0) * 1000
@@ -107,17 +128,17 @@ async def create_chat_completion(
                     request_id=req_id,
                     user_id=user.id,
                     api_key_id=api_key.id,
-                    model=model_def.slug,
-                    provider=model_def.provider,
-                    backend=model_def.backend,
+                    model=primary_def.slug,
+                    provider=primary_def.provider,
+                    backend=primary_def.backend,
                     started_at=started_at,
                     completed_at=completed_at,
                     duration_ms=duration_ms,
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                     status_code=status_code,
-                    pricing_input=model_def.pricing_input,
-                    pricing_output=model_def.pricing_output,
+                    pricing_input=primary_def.pricing_input,
+                    pricing_output=primary_def.pricing_output,
                     error_code=error_code,
                     stream=True,
                     client_ip=client_ip,
@@ -136,24 +157,25 @@ async def create_chat_completion(
         )
 
     else:
-        # --- Non-Streaming Execution ---
-        status_code = 200
-        error_code = None
+        # --- Non-Streaming Execution with Resilience (Retries + Fallback) ---
+        await concurrency_manager.acquire(
+            model_slug=primary_def.slug,
+            backend=primary_def.backend,
+            timeout=settings.DEFAULT_QUEUE_TIMEOUT_SECONDS,
+        )
+
         try:
-            if instance:
-                instance.active_requests += 1
+            response, used_def, used_inst, fallback_used = await resilience_manager.execute_chat_completion(
+                request=chat_req,
+                primary=primary_candidate,
+                fallbacks=fallback_candidates,
+            )
 
-            response: ChatCompletionResponse = await provider.chat_completion(chat_req)
-
-            # Ensure usage metrics are populated
             comp_tokens = (
                 response.usage.completion_tokens
                 if response.usage and response.usage.completion_tokens > 0
-                else count_tokens_text(
-                    response.choices[0].message.content if response.choices else ""
-                )
+                else count_tokens_text(response.choices[0].message.content if response.choices else "")
             )
-
             prompt_tokens_final = (
                 response.usage.prompt_tokens
                 if response.usage and response.usage.prompt_tokens > 0
@@ -168,25 +190,23 @@ async def create_chat_completion(
                 if settings.STORE_REQUEST_CONTENT
                 else None
             )
-            reply_str = (
-                response.choices[0].message.content if response.choices else None
-            )
+            reply_str = response.choices[0].message.content if response.choices else None
 
             await usage_tracker.record_usage(
                 request_id=req_id,
                 user_id=user.id,
                 api_key_id=api_key.id,
-                model=model_def.slug,
-                provider=model_def.provider,
-                backend=model_def.backend,
+                model=used_def.slug,
+                provider=used_def.provider,
+                backend=used_def.backend,
                 started_at=started_at,
                 completed_at=completed_at,
                 duration_ms=duration_ms,
                 prompt_tokens=prompt_tokens_final,
                 completion_tokens=comp_tokens,
                 status_code=200,
-                pricing_input=model_def.pricing_input,
-                pricing_output=model_def.pricing_output,
+                pricing_input=used_def.pricing_input,
+                pricing_output=used_def.pricing_output,
                 stream=False,
                 client_ip=client_ip,
                 prompt_content=prompt_str,
@@ -203,9 +223,9 @@ async def create_chat_completion(
                 request_id=req_id,
                 user_id=user.id,
                 api_key_id=api_key.id,
-                model=model_def.slug,
-                provider=model_def.provider,
-                backend=model_def.backend,
+                model=primary_def.slug,
+                provider=primary_def.provider,
+                backend=primary_def.backend,
                 started_at=started_at,
                 completed_at=datetime.now(timezone.utc),
                 duration_ms=duration_ms,
@@ -218,6 +238,4 @@ async def create_chat_completion(
             )
             raise e
         finally:
-            concurrency_manager.release(model_def.slug)
-            if instance and instance.active_requests > 0:
-                instance.active_requests -= 1
+            concurrency_manager.release(primary_def.slug, primary_def.backend)

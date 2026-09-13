@@ -96,6 +96,73 @@ async def db_session():
         session.add(revoked_key)
 
         # Seed models
+        universal_model = ModelDefinition(
+            name="Universal Smart Router",
+            slug="universal",
+            aliases="universal,auto,smart",
+            provider="router",
+            backend="router",
+            backend_model_name="universal",
+            endpoint="http://127.0.0.1:8000",
+            context_length=8192,
+            supports_chat=True,
+            supports_completion=True,
+            supports_tools=True,
+            supports_vision=True,
+            supports_coding=True,
+            supports_reasoning=True,
+            enabled=True,
+            priority=1000,
+        )
+        session.add(universal_model)
+
+        fast_model = ModelDefinition(
+            name="Fast Model",
+            slug="fast",
+            aliases="fast,qwen-fast,general",
+            provider="local-mock",
+            backend="openai_compatible",
+            backend_model_name="mock-fast",
+            endpoint="http://127.0.0.1:8000/v1/_mock",
+            context_length=8192,
+            supports_chat=True,
+            enabled=True,
+            priority=100,
+        )
+        session.add(fast_model)
+
+        coding_model = ModelDefinition(
+            name="Coding Model",
+            slug="coding",
+            aliases="coding,coder",
+            provider="local-mock",
+            backend="openai_compatible",
+            backend_model_name="mock-fast",
+            endpoint="http://127.0.0.1:8000/v1/_mock",
+            context_length=8192,
+            supports_chat=True,
+            supports_coding=True,
+            enabled=True,
+            priority=95,
+        )
+        session.add(coding_model)
+
+        reasoning_model = ModelDefinition(
+            name="Reasoning Model",
+            slug="reasoning",
+            aliases="reasoning,heavy",
+            provider="local-mock",
+            backend="openai_compatible",
+            backend_model_name="mock-fast",
+            endpoint="http://127.0.0.1:8000/v1/_mock",
+            context_length=4096,
+            supports_chat=True,
+            supports_reasoning=True,
+            enabled=True,
+            priority=90,
+        )
+        session.add(reasoning_model)
+
         mock_model = ModelDefinition(
             name="Mock Fast Model",
             slug="mock-fast",
@@ -108,7 +175,7 @@ async def db_session():
             supports_chat=True,
             supports_completion=True,
             enabled=True,
-            priority=100,
+            priority=50,
         )
         session.add(mock_model)
 

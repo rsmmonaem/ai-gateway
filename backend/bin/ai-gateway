@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PYTHONPATH="$SCRIPT_DIR"
-python3 -m app.cli "$@"
+if [ -f "$SCRIPT_DIR/.venv/bin/python" ]; then
+    "$SCRIPT_DIR/.venv/bin/python" -m app.cli "$@"
+else
+    python3 -m app.cli "$@"
+fi
